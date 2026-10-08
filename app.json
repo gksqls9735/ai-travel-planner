@@ -3,7 +3,7 @@
     "name": "ai-travel-planner",
     "slug": "ai-travel-planner",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "aitravelplanner",
     "userInterfaceStyle": "automatic",
@@ -21,6 +21,7 @@
     },
     "web": {
       "output": "static",
+      "bundler": "metro",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
