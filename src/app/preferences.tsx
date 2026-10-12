@@ -28,7 +28,11 @@ export default function PreferencesScreen() {
     const list = trip.companions.filter((item) => item !== 'solo');
     updateTrip({ companions: toggleList(list, id), partySize: Math.max(2, trip.partySize) });
   };
-  const generate = () => { setLoading(true); setTimeout(() => router.replace('/itinerary'), 900); };
+  const generate = () => {
+    if (loading) return;
+    setLoading(true);
+    router.push('/generating');
+  };
 
   return <View style={styles.screen}>
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(16, insets.top + 12) }]} showsVerticalScrollIndicator={false}>
@@ -51,7 +55,7 @@ export default function PreferencesScreen() {
       <Question number="04" title="미리 알아둘 것이 있나요?" copy="선택 사항이에요." />
       <View style={styles.extraWrap}>{extras.map((item) => { const selected = trip.requests.includes(item); return <Pressable key={item} onPress={() => updateTrip({ requests: toggleList(trip.requests, item) })} style={[styles.extra, selected && styles.extraSelected]}><Text style={[styles.extraText, selected && styles.extraTextSelected]}>{selected ? '✓  ' : ''}{item}</Text></Pressable>; })}</View>
     </ScrollView>
-    <View style={styles.ctaBar}><Pressable disabled={trip.interests.length < 3 || loading} onPress={generate} style={[styles.cta, (trip.interests.length < 3 || loading) && styles.ctaDisabled]}><Text style={styles.ctaText}>{loading ? '여행을 디자인하고 있어요…' : '나만의 일정 만들기'}</Text><Text style={styles.ctaIcon}>✦</Text></Pressable></View>
+    <View style={styles.ctaBar}><Pressable disabled={trip.interests.length < 3 || loading} onPress={generate} style={[styles.cta, (trip.interests.length < 3 || loading) && styles.ctaDisabled]}><Text style={styles.ctaText}>{loading ? '준비하고 있어요…' : '나만의 일정 만들기'}</Text><Text style={styles.ctaIcon}>✦</Text></Pressable></View>
   </View>;
 }
 
