@@ -5,12 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripMap } from '@/features/trip/trip-map';
 import { PlaceDetailModal } from '@/features/trip/place-detail-modal';
+import { PlaceReplacementSheet, ReplacementCandidate } from '@/features/trip/place-replacement-sheet';
 import { useTrip } from '@/features/trip/trip-context';
 import { responsive } from '@/features/layout/responsive';
 import { colors, shadow, spacing } from '@/features/trip/theme';
 
 type Stop = { time: string; name: string; category: string; duration: string; icon: string; alt: string[] };
 type SelectedPlace = { day: number; index: number; stop: Stop };
+type ReplacementRequest = { day: number; index: number; returnToDetail: boolean };
 type WebPointerGestureEvent = {
   preventDefault: () => void;
   currentTarget: {
@@ -42,14 +44,17 @@ export default function ItineraryScreen() {
   const webDragStartY = useRef(0);
   const webDragDeltaY = useRef(0);
   const isWebDragging = useRef(false);
-  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null); const [toast, setToast] = useState('');
-  const replaceStop = (dayIndex: number, index: number) => {
-    const current = stops[dayIndex]?.[index];
-    if (!current) return null;
-    const nextStop = { ...current, name: current.alt[0], alt: [current.name, ...current.alt.slice(1)] };
-    setStops((all) => all.map((list, listIndex) => listIndex === dayIndex ? list.map((stop, stopIndex) => stopIndex === index ? nextStop : stop) : list));
+  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null); const [replacementRequest, setReplacementRequest] = useState<ReplacementRequest | null>(null); const [toast, setToast] = useState('');
+  const applyReplacement = (candidate: ReplacementCandidate) => {
+    if (!replacementRequest) return;
+    const { day: targetDay, index, returnToDetail } = replacementRequest;
+    const current = stops[targetDay]?.[index];
+    if (!current) return;
+    const nextStop = { ...current, ...candidate, alt: [current.name, ...current.alt.filter((name) => name !== candidate.name)] };
+    setStops((all) => all.map((list, listIndex) => listIndex === targetDay ? list.map((stop, stopIndex) => stopIndex === index ? nextStop : stop) : list));
+    if (returnToDetail) setSelectedPlace({ day: targetDay, index, stop: nextStop });
+    setReplacementRequest(null);
     notify(`“${nextStop.name}”으로 바꿨어요.`);
-    return nextStop;
   };
   const notify = (message: string) => { setToast(message); setTimeout(() => setToast(''), 2000); };
   const snapSheet = (top: number) => {
@@ -136,7 +141,7 @@ export default function ItineraryScreen() {
         {stops[day].map((stop, index) => { const key = `${day}-${index}`; const isLocked = locked.includes(key); return <View key={key}>
           <View style={styles.stop}><View style={styles.timeColumn}><Text style={styles.time}>{stop.time}</Text><View style={styles.dot} />{index < stops[day].length - 1 ? <View style={styles.line} /> : null}</View>
             <View style={styles.stopContent}><View style={styles.stopTop}><Pressable accessibilityRole="button" accessibilityLabel={`${stop.name} 장소 정보 보기`} onPress={() => setSelectedPlace({ day, index, stop })} style={styles.placeSummary}><View style={styles.placeIcon}><Text style={styles.placeEmoji}>{stop.icon}</Text></View><View style={styles.placeCopy}><Text style={styles.placeName}>{stop.name}</Text><Text style={styles.placeMeta}>{stop.category} · {stop.duration}</Text></View></Pressable><Pressable accessibilityRole="button" accessibilityLabel={isLocked ? '장소 고정 해제' : '장소 고정'} onPress={() => setLocked((items) => isLocked ? items.filter((item) => item !== key) : [...items, key])} style={[styles.lock, isLocked && styles.lockActive]}><Ionicons name={isLocked ? 'lock-closed' : 'lock-open-outline'} size={15} color={isLocked ? colors.primary : colors.textMuted} /></Pressable></View>
-              <Pressable disabled={isLocked} onPress={() => replaceStop(day, index)} style={[styles.regenerate, isLocked && styles.disabled]}><Text style={styles.regenerateText}>↻  이 장소 대신 다른 곳 추천</Text></Pressable>
+              <Pressable disabled={isLocked} onPress={() => setReplacementRequest({ day, index, returnToDetail: false })} style={[styles.regenerate, isLocked && styles.disabled]}><Text style={styles.regenerateText}>↻  이 장소 대신 다른 곳 추천</Text></Pressable>
             </View>
           </View>
           {index < stops[day].length - 1 ? <View style={styles.transit}><Text style={styles.transitIcon}>⌁</Text><Text style={styles.transitText}>대중교통으로 {index % 2 ? '24분' : '18분'}</Text></View> : null}
@@ -144,7 +149,8 @@ export default function ItineraryScreen() {
         <Pressable onPress={() => notify('장소 추가 기능은 준비 중이에요.')} style={styles.add}><Text style={styles.addText}>＋ 일정에 장소 추가</Text></Pressable><View style={styles.bottomSpace} />
       </ScrollView>
     </Animated.View>
-    <PlaceDetailModal destination={trip.destination || '도쿄'} isLocked={selectedPlace ? locked.includes(`${selectedPlace.day}-${selectedPlace.index}`) : false} onClose={() => setSelectedPlace(null)} onKeep={() => { if (!selectedPlace) return; const key = `${selectedPlace.day}-${selectedPlace.index}`; setLocked((items) => items.includes(key) ? items : [...items, key]); notify('이 장소를 일정에 유지할게요.'); setSelectedPlace(null); }} onRegenerate={() => { if (!selectedPlace) return; const nextStop = replaceStop(selectedPlace.day, selectedPlace.index); if (nextStop) setSelectedPlace({ ...selectedPlace, stop: nextStop }); }} place={selectedPlace?.stop ?? null} />
+    <PlaceDetailModal destination={trip.destination || '도쿄'} isLocked={selectedPlace ? locked.includes(`${selectedPlace.day}-${selectedPlace.index}`) : false} onClose={() => setSelectedPlace(null)} onKeep={() => { if (!selectedPlace) return; const key = `${selectedPlace.day}-${selectedPlace.index}`; setLocked((items) => items.includes(key) ? items : [...items, key]); notify('이 장소를 일정에 유지할게요.'); setSelectedPlace(null); }} onRegenerate={() => { if (!selectedPlace) return; setReplacementRequest({ day: selectedPlace.day, index: selectedPlace.index, returnToDetail: true }); }} place={replacementRequest ? null : selectedPlace?.stop ?? null} />
+    <PlaceReplacementSheet onClose={() => setReplacementRequest(null)} onSelect={applyReplacement} place={replacementRequest ? stops[replacementRequest.day]?.[replacementRequest.index] ?? null : null} />
     {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓  {toast}</Text></View> : null}
   </View>;
 }
