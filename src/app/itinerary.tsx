@@ -4,11 +4,13 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripMap } from '@/features/trip/trip-map';
+import { PlaceDetailModal } from '@/features/trip/place-detail-modal';
 import { useTrip } from '@/features/trip/trip-context';
 import { responsive } from '@/features/layout/responsive';
 import { colors, shadow, spacing } from '@/features/trip/theme';
 
 type Stop = { time: string; name: string; category: string; duration: string; icon: string; alt: string[] };
+type SelectedPlace = { day: number; index: number; stop: Stop };
 type WebPointerGestureEvent = {
   preventDefault: () => void;
   currentTarget: {
@@ -40,8 +42,15 @@ export default function ItineraryScreen() {
   const webDragStartY = useRef(0);
   const webDragDeltaY = useRef(0);
   const isWebDragging = useRef(false);
-  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [toast, setToast] = useState('');
-  const replaceStop = (index: number) => { const current = stops[day][index]; const next = current.alt[0]; setStops((all) => all.map((list, dayIndex) => dayIndex === day ? list.map((stop, stopIndex) => stopIndex === index ? { ...stop, name: next, alt: [stop.name, ...stop.alt.slice(1)] } : stop) : list)); notify(`“${next}”으로 바꿨어요.`); };
+  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null); const [toast, setToast] = useState('');
+  const replaceStop = (dayIndex: number, index: number) => {
+    const current = stops[dayIndex]?.[index];
+    if (!current) return null;
+    const nextStop = { ...current, name: current.alt[0], alt: [current.name, ...current.alt.slice(1)] };
+    setStops((all) => all.map((list, listIndex) => listIndex === dayIndex ? list.map((stop, stopIndex) => stopIndex === index ? nextStop : stop) : list));
+    notify(`“${nextStop.name}”으로 바꿨어요.`);
+    return nextStop;
+  };
   const notify = (message: string) => { setToast(message); setTimeout(() => setToast(''), 2000); };
   const snapSheet = (top: number) => {
     Animated.spring(sheetTop, { toValue: top, useNativeDriver: false, damping: 24, stiffness: 240, mass: 0.8 }).start();
@@ -126,8 +135,8 @@ export default function ItineraryScreen() {
       <ScrollView style={styles.timeline} contentContainerStyle={styles.timelineContent} showsVerticalScrollIndicator={false}>
         {stops[day].map((stop, index) => { const key = `${day}-${index}`; const isLocked = locked.includes(key); return <View key={key}>
           <View style={styles.stop}><View style={styles.timeColumn}><Text style={styles.time}>{stop.time}</Text><View style={styles.dot} />{index < stops[day].length - 1 ? <View style={styles.line} /> : null}</View>
-            <View style={styles.stopContent}><View style={styles.stopTop}><View style={styles.placeIcon}><Text style={styles.placeEmoji}>{stop.icon}</Text></View><View style={styles.placeCopy}><Text style={styles.placeName}>{stop.name}</Text><Text style={styles.placeMeta}>{stop.category} · {stop.duration}</Text></View><Pressable onPress={() => setLocked((items) => isLocked ? items.filter((item) => item !== key) : [...items, key])} style={[styles.lock, isLocked && styles.lockActive]}><Text style={[styles.lockText, isLocked && styles.lockTextActive]}>{isLocked ? '●' : '○'}</Text></Pressable></View>
-              <Pressable disabled={isLocked} onPress={() => replaceStop(index)} style={[styles.regenerate, isLocked && styles.disabled]}><Text style={styles.regenerateText}>↻  이 장소 대신 다른 곳 추천</Text></Pressable>
+            <View style={styles.stopContent}><View style={styles.stopTop}><Pressable accessibilityRole="button" accessibilityLabel={`${stop.name} 장소 정보 보기`} onPress={() => setSelectedPlace({ day, index, stop })} style={styles.placeSummary}><View style={styles.placeIcon}><Text style={styles.placeEmoji}>{stop.icon}</Text></View><View style={styles.placeCopy}><Text style={styles.placeName}>{stop.name}</Text><Text style={styles.placeMeta}>{stop.category} · {stop.duration}</Text></View></Pressable><Pressable accessibilityRole="button" accessibilityLabel={isLocked ? '장소 고정 해제' : '장소 고정'} onPress={() => setLocked((items) => isLocked ? items.filter((item) => item !== key) : [...items, key])} style={[styles.lock, isLocked && styles.lockActive]}><Ionicons name={isLocked ? 'lock-closed' : 'lock-open-outline'} size={15} color={isLocked ? colors.primary : colors.textMuted} /></Pressable></View>
+              <Pressable disabled={isLocked} onPress={() => replaceStop(day, index)} style={[styles.regenerate, isLocked && styles.disabled]}><Text style={styles.regenerateText}>↻  이 장소 대신 다른 곳 추천</Text></Pressable>
             </View>
           </View>
           {index < stops[day].length - 1 ? <View style={styles.transit}><Text style={styles.transitIcon}>⌁</Text><Text style={styles.transitText}>대중교통으로 {index % 2 ? '24분' : '18분'}</Text></View> : null}
@@ -135,6 +144,7 @@ export default function ItineraryScreen() {
         <Pressable onPress={() => notify('장소 추가 기능은 준비 중이에요.')} style={styles.add}><Text style={styles.addText}>＋ 일정에 장소 추가</Text></Pressable><View style={styles.bottomSpace} />
       </ScrollView>
     </Animated.View>
+    <PlaceDetailModal destination={trip.destination || '도쿄'} isLocked={selectedPlace ? locked.includes(`${selectedPlace.day}-${selectedPlace.index}`) : false} onClose={() => setSelectedPlace(null)} onKeep={() => { if (!selectedPlace) return; const key = `${selectedPlace.day}-${selectedPlace.index}`; setLocked((items) => items.includes(key) ? items : [...items, key]); notify('이 장소를 일정에 유지할게요.'); setSelectedPlace(null); }} onRegenerate={() => { if (!selectedPlace) return; const nextStop = replaceStop(selectedPlace.day, selectedPlace.index); if (nextStop) setSelectedPlace({ ...selectedPlace, stop: nextStop }); }} place={selectedPlace?.stop ?? null} />
     {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓  {toast}</Text></View> : null}
   </View>;
 }
@@ -146,6 +156,6 @@ const styles = StyleSheet.create({
   sheetHeader: { paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }, sheetHeading: { flex: 1, minWidth: 0 }, sheetKicker: { color: colors.primary, fontSize: 10, fontWeight: '900', marginBottom: 5 }, sheetTitle: { color: colors.text, fontSize: 18, lineHeight: 25, fontWeight: '900', letterSpacing: -0.4 }, optimized: { flexShrink: 0, backgroundColor: colors.primarySoft, borderRadius: 12, paddingHorizontal: 9, paddingVertical: 7 }, optimizedText: { color: colors.primaryDark, fontSize: 9, fontWeight: '900' },
   daysScroll: { flexGrow: 0, maxHeight: 90 }, days: { paddingHorizontal: spacing.lg, gap: 8, paddingTop: 18, paddingBottom: 14 }, day: { width: 72, height: 58, borderRadius: 17, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, dayActive: { backgroundColor: colors.primary }, dayName: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' }, dayNameActive: { color: '#FFF' }, dayDate: { color: colors.textMuted, fontSize: 9, marginTop: 3 }, dayDateActive: { color: '#DDE0FF' },
   timeline: { flex: 1, borderTopWidth: 1, borderTopColor: colors.border }, timelineContent: { paddingHorizontal: spacing.lg, paddingTop: 22 }, stop: { flexDirection: 'row', gap: 12 }, timeColumn: { width: 48, alignItems: 'center' }, time: { color: colors.text, fontSize: 11, fontWeight: '900', marginBottom: 8 }, dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, borderWidth: 3, borderColor: colors.primarySoft }, line: { width: 2, flex: 1, minHeight: 92, backgroundColor: colors.border, marginTop: 4 },
-  stopContent: { flex: 1, paddingBottom: 8 }, stopTop: { flexDirection: 'row', alignItems: 'center', gap: 11 }, placeIcon: { width: 44, height: 44, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, placeEmoji: { fontSize: 20 }, placeCopy: { flex: 1 }, placeName: { color: colors.text, fontSize: 14, lineHeight: 20, fontWeight: '900' }, placeMeta: { color: colors.textSecondary, fontSize: 10, marginTop: 4 }, lock: { width: 32, height: 32, borderRadius: 12, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, lockActive: { backgroundColor: colors.primarySoft }, lockText: { color: colors.textMuted, fontSize: 12 }, lockTextActive: { color: colors.primary }, regenerate: { alignSelf: 'flex-start', minHeight: 34, marginTop: 11, borderRadius: 12, backgroundColor: colors.surfaceSubtle, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' }, regenerateText: { color: colors.primaryDark, fontSize: 10, fontWeight: '800' }, disabled: { opacity: 0.4 },
+  stopContent: { flex: 1, paddingBottom: 8 }, stopTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, placeSummary: { flex: 1, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 11 }, placeIcon: { width: 44, height: 44, flexShrink: 0, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, placeEmoji: { fontSize: 20 }, placeCopy: { flex: 1, minWidth: 0 }, placeName: { color: colors.text, fontSize: 14, lineHeight: 20, fontWeight: '900' }, placeMeta: { color: colors.textSecondary, fontSize: 10, marginTop: 4 }, lock: { width: 36, height: 36, flexShrink: 0, borderRadius: 13, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, lockActive: { backgroundColor: colors.primarySoft }, regenerate: { alignSelf: 'flex-start', minHeight: 34, marginTop: 11, borderRadius: 12, backgroundColor: colors.surfaceSubtle, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' }, regenerateText: { color: colors.primaryDark, fontSize: 10, fontWeight: '800' }, disabled: { opacity: 0.4 },
   transit: { marginLeft: 60, flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9 }, transitIcon: { color: colors.textMuted, fontSize: 15 }, transitText: { color: colors.textMuted, fontSize: 10, fontWeight: '700' }, add: { minHeight: 48, marginLeft: 60, marginTop: 12, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.primary, fontSize: 11, fontWeight: '900' }, bottomSpace: { height: 28 }, toast: { position: 'absolute', bottom: 24, alignSelf: 'center', backgroundColor: colors.text, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 12, zIndex: 5 }, toastText: { color: '#FFF', fontSize: 11, fontWeight: '800' },
 });
