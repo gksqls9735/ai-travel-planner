@@ -1,79 +1,159 @@
-import { useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { CalendarRange } from '@/features/trip/calendar-range';
-import { destinations, useTrip } from '@/features/trip/trip-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+
+import { getScreenPadding, responsive } from '@/features/layout/responsive';
 import { colors, shadow, spacing } from '@/features/trip/theme';
+import { TripState, useTrip } from '@/features/trip/trip-context';
 
-export default function TripSetupScreen() {
+type SavedTrip = {
+  id: string;
+  city: string;
+  country: string;
+  code: string;
+  dates: string;
+  startDate: string;
+  endDate: string;
+  days: number;
+  places: number;
+  status: '다가오는 여행' | '다녀온 여행';
+  symbol: string;
+  palette: { background: string; accent: string };
+};
+
+const savedTrips: SavedTrip[] = [
+  { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', palette: { background: '#242943', accent: '#858CFF' } },
+  { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', palette: { background: '#315B57', accent: '#8BD8C4' } },
+  { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', palette: { background: '#704C55', accent: '#F4B7B8' } },
+];
+
+export default function MyTripsScreen() {
   const router = useRouter();
-  const { trip, updateTrip } = useTrip();
-  const [query, setQuery] = useState(trip.destination);
-  const [searching, setSearching] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const matches = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    return value ? destinations.filter((item) => `${item.city} ${item.country} ${item.code}`.toLowerCase().includes(value)) : destinations.slice(0, 4);
-  }, [query]);
-  const ready = Boolean(trip.destination && trip.startDate && trip.endDate);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { updateTrip } = useTrip();
+  const horizontalPadding = getScreenPadding(width);
+  const useTwoColumns = width >= responsive.tabletBreakpoint;
 
-  return <View style={styles.screen}>
-    <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={styles.hero}>
-        <View style={styles.glowOne} /><View style={styles.glowTwo} />
-        <View style={styles.nav}><View style={styles.logo}><Text style={styles.logoText}>W</Text></View><Text style={styles.brand}>WANDER</Text><View style={styles.avatar}><Text style={styles.avatarText}>ME</Text></View></View>
-        <Text style={styles.heroLabel}>AI TRIP PLANNER</Text>
-        <Text style={styles.heroTitle}>다음 여행은{`\n`}어디로 갈까요?</Text>
-        <View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput accessibilityLabel="여행지 검색" value={query} placeholder="도시 또는 공항 검색" placeholderTextColor="#8C94A7" style={styles.searchInput}
-          onFocus={() => setSearching(true)} onChangeText={(value) => { setQuery(value); setSearching(true); if (value !== trip.destination) updateTrip({ destination: '', destinationCode: '' }); }} />
-          {query ? <Pressable onPress={() => { setQuery(''); updateTrip({ destination: '', destinationCode: '' }); }}><Text style={styles.clear}>×</Text></Pressable> : null}</View>
-        {searching ? <View style={styles.suggestions}>{matches.length ? matches.map((item) => <Pressable key={item.code} onPress={() => { setQuery(item.city); updateTrip({ destination: item.city, destinationCode: item.code }); setSearching(false); }} style={styles.suggestion}>
-          <View style={styles.suggestionPin}><Text style={styles.suggestionPinText}>⌖</Text></View><View style={styles.grow}><Text style={styles.suggestionTitle}>{item.city}</Text><Text style={styles.suggestionSub}>{item.country} · {item.airport}</Text></View><Text style={styles.suggestionCode}>{item.code}</Text>
-        </Pressable>) : <Text style={styles.noResult}>검색 결과가 없어요.</Text>}</View> : null}
-      </View>
+  const openTrip = (savedTrip: SavedTrip) => {
+    const patch: Partial<TripState> = {
+      destination: savedTrip.city,
+      destinationCode: savedTrip.code,
+      startDate: savedTrip.startDate,
+      endDate: savedTrip.endDate,
+    };
+    updateTrip(patch);
+    router.push('/itinerary');
+  };
 
-      <View style={styles.sheet}>
-        <View style={styles.handle} />
-        <View style={styles.sheetIntro}><Text style={styles.sheetTitle}>여행의 윤곽을 잡아볼게요</Text><Text style={styles.sheetCopy}>정확하지 않아도 괜찮아요. 나중에 언제든 바꿀 수 있어요.</Text></View>
+  return (
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top, 12) + 8, paddingHorizontal: horizontalPadding }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <View accessibilityLabel="Wander" style={styles.brandMark}><Text style={styles.brandMarkText}>W</Text></View>
+          <View style={styles.headerCopy}>
+            <Text style={styles.eyebrow}>MY TRIPS</Text>
+            <Text style={styles.title}>내 여행 보관함</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="새 여행 만들기" onPress={() => router.push('/new-trip')} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </Pressable>
+        </View>
 
-        <Pressable onPress={() => setCalendarOpen(true)} style={styles.bigRow}>
-          <View style={styles.rowIcon}><Text style={styles.rowIconText}>▣</Text></View>
-          <View style={styles.grow}><Text style={styles.rowLabel}>여행 날짜</Text><Text style={[styles.rowValue, !trip.startDate && styles.placeholder]}>{trip.startDate && trip.endDate ? `${formatDate(trip.startDate)}  →  ${formatDate(trip.endDate)}` : '출발일과 도착일 선택'}</Text></View>
-          <Text style={styles.chevron}>›</Text>
-        </Pressable>
+        <View style={styles.intro}>
+          <Text style={styles.introTitle}>다시 떠나고 싶은 여행을{`\n`}한곳에 모았어요.</Text>
+          <Text style={styles.introCopy}>저장한 일정을 열어 장소를 바꾸거나 동선을 다시 확인해 보세요.</Text>
+        </View>
 
-        <View style={styles.divider} />
-        <View style={styles.flightHeader}><View><Text style={styles.sectionTitle}>항공편 시간</Text><Text style={styles.sectionCopy}>여행지 현지 시간을 입력해 주세요.</Text></View><View style={styles.laterControl}><Text style={styles.laterLabel}>나중에</Text><Switch value={trip.flightLater} onValueChange={(flightLater) => updateTrip({ flightLater })} trackColor={{ false: colors.borderStrong, true: colors.primary }} thumbColor="#FFFFFF" /></View></View>
-        {!trip.flightLater ? <View style={styles.flightGrid}>
-          <View style={styles.flightField}><Text style={styles.flightMark}>↘</Text><View style={styles.grow}><Text style={styles.flightLabel}>도착</Text><TextInput accessibilityLabel="도착 시간" value={trip.arrivalTime} onChangeText={(arrivalTime) => updateTrip({ arrivalTime })} style={styles.timeInput} maxLength={5} /></View></View>
-          <View style={styles.flightField}><Text style={[styles.flightMark, styles.departure]}>↗</Text><View style={styles.grow}><Text style={styles.flightLabel}>출발</Text><TextInput accessibilityLabel="출발 시간" value={trip.departureTime} onChangeText={(departureTime) => updateTrip({ departureTime })} style={styles.timeInput} maxLength={5} /></View></View>
-        </View> : <View style={styles.skipNotice}><Text style={styles.skipText}>항공편 없이 하루 전체를 활용하는 일정으로 만들어요.</Text></View>}
-      </View>
-    </ScrollView>
-
-    <View style={styles.ctaBar}><Pressable disabled={!ready} onPress={() => router.push('/preferences')} style={[styles.cta, !ready && styles.ctaDisabled]}><Text style={styles.ctaText}>{ready ? '내 취향 알려주기' : '여행지와 날짜를 선택하세요'}</Text>{ready ? <Text style={styles.ctaArrow}>→</Text> : null}</Pressable></View>
-
-    <Modal visible={calendarOpen} animationType="slide" transparent onRequestClose={() => setCalendarOpen(false)}>
-      <View style={styles.modalBackdrop}><Pressable style={styles.modalDismiss} onPress={() => setCalendarOpen(false)} /><View style={styles.calendarSheet}><View style={styles.modalHandle} /><View style={styles.modalHeader}><View><Text style={styles.modalKicker}>여행 기간</Text><Text style={styles.modalTitle}>언제 떠나시나요?</Text></View><Pressable onPress={() => setCalendarOpen(false)} style={styles.closeButton}><Text style={styles.closeText}>×</Text></Pressable></View>
-        <CalendarRange startDate={trip.startDate} endDate={trip.endDate} onChange={(startDate, endDate) => updateTrip({ startDate, endDate })} />
-        <Pressable disabled={!trip.startDate || !trip.endDate} onPress={() => setCalendarOpen(false)} style={[styles.confirm, (!trip.startDate || !trip.endDate) && styles.ctaDisabled]}><Text style={styles.confirmText}>이 날짜로 선택</Text></Pressable>
-      </View></View>
-    </Modal>
-  </View>;
+        {savedTrips.length ? (
+          <View style={styles.tripGrid}>
+            {savedTrips.map((savedTrip) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${savedTrip.city} ${savedTrip.dates} 일정 열기`}
+                key={savedTrip.id}
+                onPress={() => openTrip(savedTrip)}
+                style={({ pressed }) => [styles.tripCard, useTwoColumns && styles.tripCardWide, pressed && styles.cardPressed]}
+              >
+                <View style={[styles.cover, { backgroundColor: savedTrip.palette.background }]}>
+                  <View style={[styles.coverOrb, { backgroundColor: savedTrip.palette.accent }]} />
+                  <Text style={styles.coverSymbol}>{savedTrip.symbol}</Text>
+                  <View style={styles.statusPill}><View style={[styles.statusDot, savedTrip.status === '다녀온 여행' && styles.statusDotMuted]} /><Text style={styles.statusText}>{savedTrip.status}</Text></View>
+                  <View style={styles.coverArrow}><Ionicons name="arrow-forward" size={18} color="#FFFFFF" /></View>
+                </View>
+                <View style={styles.cardBody}>
+                  <View style={styles.destinationRow}>
+                    <View style={styles.destinationCopy}><Text style={styles.city}>{savedTrip.city}</Text><Text style={styles.country}>{savedTrip.country}</Text></View>
+                    <Text style={styles.code}>{savedTrip.code}</Text>
+                  </View>
+                  <Text style={styles.dates}>{savedTrip.dates}</Text>
+                  <View style={styles.metaRow}>
+                    <View style={styles.metaItem}><Ionicons name="calendar-outline" size={15} color={colors.textSecondary} /><Text style={styles.metaText}>{savedTrip.days}일</Text></View>
+                    <View style={styles.metaDivider} />
+                    <View style={styles.metaItem}><Ionicons name="location-outline" size={15} color={colors.textSecondary} /><Text style={styles.metaText}>{savedTrip.places}개 장소</Text></View>
+                  </View>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <View style={styles.emptyIcon}><Ionicons name="map-outline" size={30} color={colors.primary} /></View>
+            <Text style={styles.emptyTitle}>아직 저장한 여행이 없어요</Text>
+            <Text style={styles.emptyCopy}>첫 여행 일정을 만들면 이곳에서 다시 볼 수 있어요.</Text>
+            <Pressable onPress={() => router.push('/new-trip')} style={styles.emptyButton}><Text style={styles.emptyButtonText}>첫 여행 만들기</Text></Pressable>
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
 }
 
-function formatDate(value: string) { const date = new Date(`${value}T12:00:00`); return `${date.getMonth() + 1}월 ${date.getDate()}일`; }
-
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFFFFF' }, scroll: { paddingBottom: 110 }, hero: { minHeight: 360, backgroundColor: '#171A2B', paddingHorizontal: spacing.lg, paddingTop: 18, overflow: 'visible', zIndex: 5 },
-  glowOne: { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: '#6068ED', opacity: 0.32, right: -110, top: -70 }, glowTwo: { position: 'absolute', width: 180, height: 180, borderRadius: 90, backgroundColor: '#FF785A', opacity: 0.2, left: -100, bottom: -40 },
-  nav: { width: '100%', maxWidth: 680, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 9 }, logo: { width: 30, height: 30, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, logoText: { color: '#FFF', fontWeight: '900' }, brand: { color: '#FFF', fontSize: 12, fontWeight: '900', letterSpacing: 1.4, flex: 1 }, avatar: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(255,255,255,0.24)', alignItems: 'center', justifyContent: 'center' }, avatarText: { color: '#FFF', fontSize: 9, fontWeight: '800' },
-  heroLabel: { width: '100%', maxWidth: 680, alignSelf: 'center', color: '#9DA4FF', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginTop: 38 }, heroTitle: { width: '100%', maxWidth: 680, alignSelf: 'center', color: '#FFF', fontSize: 35, lineHeight: 43, fontWeight: '900', letterSpacing: -1.2, marginTop: 8 },
-  searchBox: { width: '100%', maxWidth: 680, alignSelf: 'center', height: 60, borderRadius: 20, backgroundColor: '#FFF', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 10, marginTop: 24, ...shadow.float }, searchIcon: { color: colors.primary, fontSize: 24 }, searchInput: { flex: 1, height: '100%', color: colors.text, fontSize: 15, outlineStyle: 'none' } as never, clear: { fontSize: 24, color: colors.textMuted, padding: 6 },
-  suggestions: { position: 'absolute', left: spacing.lg, right: spacing.lg, top: 330, maxWidth: 680, alignSelf: 'center', backgroundColor: '#FFF', borderRadius: 20, overflow: 'hidden', ...shadow.float }, suggestion: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: colors.border }, suggestionPin: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, suggestionPinText: { color: colors.primary }, grow: { flex: 1 }, suggestionTitle: { color: colors.text, fontSize: 14, fontWeight: '800' }, suggestionSub: { color: colors.textSecondary, fontSize: 10, marginTop: 3 }, suggestionCode: { color: colors.primary, fontSize: 10, fontWeight: '900' }, noResult: { padding: 20, textAlign: 'center', color: colors.textSecondary },
-  sheet: { width: '100%', maxWidth: 720, alignSelf: 'center', marginTop: -28, backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: spacing.lg, paddingTop: 10, paddingBottom: 28, zIndex: 2 }, handle: { width: 42, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong, alignSelf: 'center', marginBottom: 25 }, sheetIntro: { marginBottom: 22 }, sheetTitle: { color: colors.text, fontSize: 21, fontWeight: '900', letterSpacing: -0.4 }, sheetCopy: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 6 },
-  bigRow: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 13 }, rowIcon: { width: 46, height: 46, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, rowIconText: { color: colors.primary, fontSize: 19 }, rowLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '700', marginBottom: 5 }, rowValue: { color: colors.text, fontSize: 15, fontWeight: '900' }, placeholder: { color: colors.textMuted, fontWeight: '700' }, chevron: { color: colors.textMuted, fontSize: 30 }, divider: { height: 1, backgroundColor: colors.border, marginVertical: 18 },
-  flightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '900' }, sectionCopy: { color: colors.textSecondary, fontSize: 11, marginTop: 5 }, laterControl: { flexDirection: 'row', alignItems: 'center', gap: 7 }, laterLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' }, flightGrid: { flexDirection: 'row', gap: 10, marginTop: 18 }, flightField: { flex: 1, minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 18, backgroundColor: colors.surfaceSubtle, paddingHorizontal: 13 }, flightMark: { width: 32, height: 32, textAlign: 'center', lineHeight: 32, borderRadius: 10, color: colors.primary, backgroundColor: colors.primarySoft }, departure: { color: colors.accent, backgroundColor: colors.accentSoft }, flightLabel: { color: colors.textMuted, fontSize: 10, fontWeight: '700' }, timeInput: { color: colors.text, fontSize: 18, fontWeight: '900', paddingVertical: 3, outlineStyle: 'none' } as never, skipNotice: { marginTop: 16, padding: 15, borderRadius: 16, backgroundColor: colors.surfaceSubtle }, skipText: { color: colors.textSecondary, fontSize: 12, textAlign: 'center' },
-  ctaBar: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.96)', borderTopWidth: 1, borderTopColor: colors.border, paddingHorizontal: spacing.md, paddingTop: 11, paddingBottom: 18 }, cta: { width: '100%', maxWidth: 680, alignSelf: 'center', minHeight: 56, borderRadius: 18, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 14 }, ctaDisabled: { backgroundColor: '#C8CCD6' }, ctaText: { color: '#FFF', fontSize: 15, fontWeight: '900' }, ctaArrow: { color: '#FFF', fontSize: 20 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(9,12,26,0.48)', justifyContent: 'flex-end' }, modalDismiss: { flex: 1 }, calendarSheet: { width: '100%', maxWidth: 720, alignSelf: 'center', backgroundColor: '#FFF', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: spacing.lg, paddingTop: 10, paddingBottom: 24 }, modalHandle: { width: 42, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong, alignSelf: 'center', marginBottom: 20 }, modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }, modalKicker: { color: colors.primary, fontSize: 11, fontWeight: '800' }, modalTitle: { color: colors.text, fontSize: 22, fontWeight: '900', marginTop: 4 }, closeButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, closeText: { color: colors.text, fontSize: 24 }, confirm: { height: 54, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 20 }, confirmText: { color: '#FFF', fontSize: 14, fontWeight: '900' },
+  screen: { flex: 1, backgroundColor: colors.background },
+  scrollContent: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingBottom: 48 },
+  header: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  brandMark: { width: 48, height: 48, flexShrink: 0, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...shadow.card },
+  brandMarkText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
+  pressed: { opacity: 0.72 },
+  headerCopy: { flex: 1, minWidth: 0 },
+  eyebrow: { color: colors.primary, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.4 },
+  title: { color: colors.text, fontSize: 20, lineHeight: 27, fontWeight: '900', marginTop: 1 },
+  addButton: { width: 48, height: 48, flexShrink: 0, borderRadius: 24, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...shadow.card },
+  intro: { marginTop: 40, marginBottom: 24 },
+  introTitle: { color: colors.text, fontSize: 29, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
+  introCopy: { maxWidth: 520, color: colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 10 },
+  tripGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  tripCard: { width: '100%', minWidth: 0, borderRadius: 24, backgroundColor: colors.surface, overflow: 'hidden', ...shadow.card },
+  tripCardWide: { flexBasis: '47%', flexGrow: 1, maxWidth: 520 },
+  cardPressed: { opacity: 0.88, transform: [{ scale: 0.99 }] },
+  cover: { height: 142, overflow: 'hidden', padding: spacing.md, justifyContent: 'flex-end' },
+  coverOrb: { position: 'absolute', width: 190, height: 190, borderRadius: 95, opacity: 0.38, right: -28, top: -76 },
+  coverSymbol: { position: 'absolute', right: 16, bottom: -10, color: 'rgba(255,255,255,0.16)', fontSize: 58, lineHeight: 68, fontWeight: '900', letterSpacing: -3 },
+  statusPill: { position: 'absolute', left: 16, top: 16, minHeight: 29, flexDirection: 'row', alignItems: 'center', gap: 7, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 10 },
+  statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#8AF0C8' },
+  statusDotMuted: { backgroundColor: '#D5D8E0' },
+  statusText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+  coverArrow: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.17)', alignItems: 'center', justifyContent: 'center' },
+  cardBody: { padding: 18 },
+  destinationRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  destinationCopy: { flex: 1, minWidth: 0 },
+  city: { color: colors.text, fontSize: 21, lineHeight: 28, fontWeight: '900' },
+  country: { color: colors.textSecondary, fontSize: 11, lineHeight: 16, marginTop: 1 },
+  code: { flexShrink: 0, color: colors.primaryDark, fontSize: 10, fontWeight: '900', backgroundColor: colors.primarySoft, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 6 },
+  dates: { color: colors.text, fontSize: 12, fontWeight: '800', marginTop: 14 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: colors.border },
+  metaItem: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  metaDivider: { width: 1, height: 13, backgroundColor: colors.borderStrong },
+  metaText: { color: colors.textSecondary, fontSize: 10, fontWeight: '700' },
+  emptyState: { minHeight: 360, borderRadius: 24, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, ...shadow.card },
+  emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 18 },
+  emptyCopy: { maxWidth: 280, color: colors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
+  emptyButton: { minWidth: 160, minHeight: 48, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 22, paddingHorizontal: 18 },
+  emptyButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
 });
