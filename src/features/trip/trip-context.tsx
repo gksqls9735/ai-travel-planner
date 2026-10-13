@@ -2,6 +2,7 @@ import { createContext, PropsWithChildren, useContext, useMemo, useState } from 
 
 export type Pace = 'relaxed' | 'balanced' | 'packed';
 export type AccommodationMode = 'known' | 'recommend' | 'skip';
+export type BookingStatus = 'required' | 'booked';
 export type TripState = {
   destination: string; destinationCode: string; startDate: string; endDate: string;
   inboundDepartureTime: string; inboundArrivalTime: string;
@@ -9,6 +10,7 @@ export type TripState = {
   flightLater: boolean; companions: string[];
   partySize: number; pace: Pace; interests: string[]; requests: string[];
   accommodationMode: AccommodationMode; accommodationName: string; accommodationAddress: string;
+  accommodationBookingStatus: BookingStatus;
   checkInTime: string; checkOutTime: string; roomCount: number; accommodationBudget: string;
   accommodationArea: string; accommodationType: string; accommodationAmenities: string[];
 };
@@ -17,7 +19,7 @@ const initialTrip: TripState = {
   inboundArrivalTime: '14:30', outboundDepartureTime: '18:10', outboundArrivalTime: '20:30',
   flightLater: false, companions: [], partySize: 2, pace: 'balanced',
   interests: ['맛집 탐방', '전통 문화', '골목 산책'], requests: [],
-  accommodationMode: 'known', accommodationName: '', accommodationAddress: '', checkInTime: '15:00',
+  accommodationMode: 'known', accommodationName: '', accommodationAddress: '', accommodationBookingStatus: 'required', checkInTime: '15:00',
   checkOutTime: '11:00', roomCount: 1, accommodationBudget: '10~20만원', accommodationArea: '역 근처',
   accommodationType: '호텔', accommodationAmenities: [],
 };
@@ -56,7 +58,8 @@ export function TripProvider({ children }: PropsWithChildren) {
     trip,
     updateTrip: (patch: Partial<TripState>) => {
       setTrip((current) => ({ ...current, ...patch }));
-      if (hasItinerary) setItineraryDirty(true);
+      const changesItinerary = Object.keys(patch).some((key) => key !== 'accommodationBookingStatus');
+      if (hasItinerary && changesItinerary) setItineraryDirty(true);
     },
   }), [hasItinerary, itineraryDirty, trip]);
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;

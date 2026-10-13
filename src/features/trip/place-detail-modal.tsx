@@ -10,14 +10,21 @@ export type PlaceSummary = {
   category: string;
   duration: string;
   icon: string;
+  bookingNote?: string;
+  bookingRequirement?: PlaceBookingRequirement;
 };
+
+export type PlaceBookingRequirement = 'required' | 'recommended' | 'unknown' | 'none';
 
 type Props = {
   destination: string;
+  bookingStatus: boolean;
   isLocked: boolean;
   onClose: () => void;
+  onOpenBooking: () => void;
   onKeep: () => void;
   onRegenerate: () => void;
+  onToggleBooking: () => void;
   place: PlaceSummary | null;
 };
 
@@ -35,12 +42,21 @@ function getDescription(place: PlaceSummary) {
   return descriptions[place.name] ?? `${place.category}을(를) 즐기면서 주변 장소와 자연스럽게 연결할 수 있도록 AI가 선택한 장소예요.`;
 }
 
-export function PlaceDetailModal({ destination, isLocked, onClose, onKeep, onRegenerate, place }: Props) {
+export function PlaceDetailModal({ bookingStatus, destination, isLocked, onClose, onKeep, onOpenBooking, onRegenerate, onToggleBooking, place }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const desktop = width >= responsive.tabletBreakpoint;
 
   if (!place) return null;
+  const bookingRequirement = place.bookingRequirement ?? 'none';
+  const bookingCopy = bookingRequirement === 'required'
+    ? '방문 전에 입장권이나 이용 시간을 예약해 두는 것이 필요한 장소예요.'
+    : bookingRequirement === 'recommended'
+      ? '현장 구매가 가능할 수 있지만 원하는 시간 방문을 위해 사전 예약을 권장해요.'
+      : bookingRequirement === 'unknown'
+        ? '현재 예약 필요 여부를 확정하지 못했어요. 방문 전에 공식 안내를 확인해 주세요.'
+        : '별도 예약 없이 방문할 수 있는 장소로 분류했어요.';
+  const bookingLabel = bookingRequirement === 'required' ? '예약 필수' : bookingRequirement === 'recommended' ? '예약 권장' : bookingRequirement === 'unknown' ? '예약 여부 확인' : '예약 불필요';
 
   return <Modal animationType={desktop ? 'fade' : 'slide'} onRequestClose={onClose} statusBarTranslucent transparent visible>
     <View style={[styles.overlay, desktop ? styles.overlayDesktop : styles.overlayMobile]}>
@@ -74,6 +90,12 @@ export function PlaceDetailModal({ destination, isLocked, onClose, onKeep, onReg
           <View style={styles.reason}>
             <View style={styles.reasonTitleRow}><Ionicons name="sparkles-outline" size={17} color={colors.primary} /><Text style={styles.reasonTitle}>이 장소를 추천한 이유</Text></View>
             <Text style={styles.reasonText}>선택한 여행 취향과 잘 맞고, 앞뒤 장소의 이동 시간을 줄일 수 있어 일정에 포함했어요.</Text>
+          </View>
+
+          <View style={[styles.bookingCard, bookingStatus && styles.bookingCardDone]}>
+            <View style={styles.bookingHeader}><View style={[styles.bookingIcon, bookingStatus && styles.bookingIconDone]}><Ionicons name={bookingStatus ? 'checkmark' : bookingRequirement === 'none' ? 'checkmark-circle-outline' : 'ticket-outline'} size={19} color={bookingStatus ? '#FFFFFF' : colors.primaryDark} /></View><View style={styles.bookingCopy}><View style={styles.bookingTitleRow}><Text style={styles.bookingTitle}>{bookingStatus ? '예약 완료' : bookingLabel}</Text><View style={styles.mockBadge}><Text style={styles.mockBadgeText}>임시 정보</Text></View></View><Text style={styles.bookingDescription}>{bookingStatus ? '예약 상태를 일정에 저장했어요. 외부 연동 후에는 예약 내역과 바우처를 확인할 수 있어요.' : place.bookingNote ?? bookingCopy}</Text></View></View>
+            <Text style={styles.bookingSource}>현재는 샘플 분류이며 실제 예약 정책은 공식 페이지에서 확인해야 해요.</Text>
+            {bookingRequirement !== 'none' ? <View style={styles.bookingActions}><Pressable accessibilityRole="button" onPress={onOpenBooking} style={({ pressed }) => [styles.bookingLink, pressed && styles.bookingPressed]}><Ionicons name="open-outline" size={16} color="#FFFFFF" /><Text style={styles.bookingLinkText}>{bookingStatus ? '예약 내역 보기' : '예약 페이지로 이동'}</Text></Pressable><Pressable accessibilityRole="button" onPress={onToggleBooking} style={({ pressed }) => [styles.bookingState, pressed && styles.bookingPressed]}><Ionicons name={bookingStatus ? 'refresh-outline' : 'checkmark-circle-outline'} size={16} color={colors.primaryDark} /><Text style={styles.bookingStateText}>{bookingStatus ? '예약 완료 취소' : '예약 완료로 표시'}</Text></Pressable></View> : null}
           </View>
         </ScrollView>
 
@@ -122,6 +144,24 @@ const styles = StyleSheet.create({
   reasonTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   reasonTitle: { color: colors.text, fontSize: 11, fontWeight: '900' },
   reasonText: { color: colors.textSecondary, fontSize: 10, lineHeight: 17, marginTop: 8 },
+  bookingCard: { borderRadius: 19, borderWidth: 1, borderColor: '#E4E5FF', backgroundColor: '#F8F8FF', padding: 14, marginTop: 12 },
+  bookingCardDone: { borderColor: '#C8CCFF' },
+  bookingHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bookingIcon: { width: 40, height: 40, flexShrink: 0, borderRadius: 14, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  bookingIconDone: { backgroundColor: colors.primary },
+  bookingCopy: { flex: 1, minWidth: 0 },
+  bookingTitleRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
+  bookingTitle: { color: colors.text, fontSize: 12, fontWeight: '900' },
+  mockBadge: { borderRadius: 7, backgroundColor: '#FFFFFF', paddingHorizontal: 6, paddingVertical: 3 },
+  mockBadgeText: { color: colors.textMuted, fontSize: 7, fontWeight: '800' },
+  bookingDescription: { color: colors.textSecondary, fontSize: 9, lineHeight: 15, marginTop: 4 },
+  bookingSource: { color: colors.textMuted, fontSize: 8, lineHeight: 13, marginTop: 11 },
+  bookingActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 11 },
+  bookingLink: { flexBasis: 140, flexGrow: 1, minWidth: 0, minHeight: 46, borderRadius: 14, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10 },
+  bookingLinkText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
+  bookingState: { flexBasis: 140, flexGrow: 1, minWidth: 0, minHeight: 46, borderRadius: 14, borderWidth: 1, borderColor: colors.borderStrong, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 10 },
+  bookingStateText: { color: colors.primaryDark, fontSize: 10, fontWeight: '900' },
+  bookingPressed: { opacity: 0.74 },
   actions: { paddingHorizontal: spacing.lg, flexDirection: 'row', gap: 9 },
   secondaryButton: { flex: 1, minWidth: 0, minHeight: 50, borderRadius: 17, backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   secondaryText: { color: colors.primaryDark, fontSize: 11, fontWeight: '900' },
