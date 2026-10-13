@@ -3,8 +3,15 @@ import { createContext, PropsWithChildren, useContext, useMemo, useState } from 
 export type Pace = 'relaxed' | 'balanced' | 'packed';
 export type AccommodationMode = 'known' | 'recommend' | 'skip';
 export type BookingStatus = 'required' | 'booked';
+export type TripDestination = { city: string; code: string; nights: number };
+export type CityStay = {
+  city: string; code: string; mode: Exclude<AccommodationMode, 'skip'>;
+  accommodationName: string; accommodationAddress: string; bookingStatus: BookingStatus;
+  roomCount: number; budget: string; area: string; type: string; amenities: string[];
+};
 export type TripState = {
   destination: string; destinationCode: string; startDate: string; endDate: string;
+  destinationStops: TripDestination[]; cityStays: CityStay[];
   inboundDepartureTime: string; inboundArrivalTime: string;
   outboundDepartureTime: string; outboundArrivalTime: string;
   flightLater: boolean; companions: string[];
@@ -16,6 +23,7 @@ export type TripState = {
 };
 const initialTrip: TripState = {
   destination: '', destinationCode: '', startDate: '', endDate: '', inboundDepartureTime: '10:10',
+  destinationStops: [], cityStays: [],
   inboundArrivalTime: '14:30', outboundDepartureTime: '18:10', outboundArrivalTime: '20:30',
   flightLater: false, companions: [], partySize: 2, pace: 'balanced',
   interests: ['맛집 탐방', '전통 문화', '골목 산책'], requests: [],
@@ -29,6 +37,7 @@ type TripContextValue = {
   loadTrip: (patch: Partial<TripState>) => void;
   markItineraryGenerated: () => void;
   startNewTrip: () => void;
+  setCityStayBookingStatus: (city: string, status: BookingStatus) => void;
   trip: TripState;
   updateTrip: (patch: Partial<TripState>) => void;
 };
@@ -42,7 +51,11 @@ export function TripProvider({ children }: PropsWithChildren) {
     hasItinerary,
     itineraryDirty,
     loadTrip: (patch: Partial<TripState>) => {
-      setTrip({ ...initialTrip, ...patch });
+      const next = { ...initialTrip, ...patch };
+      if (!patch.destinationStops?.length && patch.destination) next.destinationStops = [{ city: patch.destination, code: patch.destinationCode ?? '', nights: Math.max(1, getNightCount(patch.startDate, patch.endDate)) }];
+      if (!patch.cityStays?.length && patch.destination) next.cityStays = [createCityStay(patch.destination, patch.destinationCode ?? '', patch)];
+      else next.cityStays = next.cityStays.map((stay) => ({ ...createCityStay(stay.city, stay.code), ...stay }));
+      setTrip(next);
       setHasItinerary(true);
       setItineraryDirty(false);
     },
@@ -54,6 +67,9 @@ export function TripProvider({ children }: PropsWithChildren) {
       setTrip(initialTrip);
       setHasItinerary(false);
       setItineraryDirty(false);
+    },
+    setCityStayBookingStatus: (city: string, status: BookingStatus) => {
+      setTrip((current) => ({ ...current, cityStays: current.cityStays.map((stay) => stay.city === city ? { ...stay, bookingStatus: status } : stay) }));
     },
     trip,
     updateTrip: (patch: Partial<TripState>) => {
@@ -69,9 +85,22 @@ export function useTrip() {
   if (!value) throw new Error('useTrip must be used inside TripProvider');
   return value;
 }
+function getNightCount(startDate = '', endDate = '') {
+  if (!startDate || !endDate) return 1;
+  return Math.max(1, Math.round((new Date(`${endDate}T12:00:00`).getTime() - new Date(`${startDate}T12:00:00`).getTime()) / 86400000));
+}
+export function createCityStay(city: string, code: string, patch: Partial<TripState> = {}): CityStay {
+  return {
+    city, code, mode: patch.accommodationMode === 'recommend' ? 'recommend' : 'known',
+    accommodationName: patch.accommodationName ?? '', accommodationAddress: patch.accommodationAddress ?? '', bookingStatus: patch.accommodationBookingStatus ?? 'required',
+    roomCount: patch.roomCount ?? 1, budget: patch.accommodationBudget ?? '10~20만원', area: patch.accommodationArea ?? '역 근처',
+    type: patch.accommodationType ?? '호텔', amenities: patch.accommodationAmenities ?? [],
+  };
+}
 export const destinations = [
   { city: '도쿄', country: '일본', airport: '하네다 · 나리타 국제공항', code: 'TYO' },
   { city: '오사카', country: '일본', airport: '간사이 국제공항', code: 'KIX' },
+  { city: '교토', country: '일본', airport: '간사이 국제공항 이용', code: 'UKY' },
   { city: '파리', country: '프랑스', airport: '샤를 드골 공항', code: 'CDG' },
   { city: '뉴욕', country: '미국', airport: 'JFK · 라과디아 공항', code: 'NYC' },
   { city: '방콕', country: '태국', airport: '수완나품 국제공항', code: 'BKK' },

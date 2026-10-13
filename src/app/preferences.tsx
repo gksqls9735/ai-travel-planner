@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pace, useTrip } from '@/features/trip/trip-context';
+import { createCityStay, Pace, TripDestination, useTrip } from '@/features/trip/trip-context';
 import { responsive } from '@/features/layout/responsive';
 import { TripsHomeButton } from '@/features/navigation/trips-home-button';
 import { colors, spacing } from '@/features/trip/theme';
@@ -23,6 +23,8 @@ const paceOptions: { id: Pace; title: string; caption: string; icon: string }[] 
 export default function PreferencesScreen() {
   const router = useRouter(); const { hasItinerary, itineraryDirty, trip, updateTrip } = useTrip(); const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
+  const totalNights = getNightCount(trip.startDate, trip.endDate);
+  const cityPlan = normalizeNights(trip.destinationStops, totalNights);
   const toggleList = (list: string[], value: string) => list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
   const toggleCompanion = (id: string) => {
     if (id === 'solo') return updateTrip({ companions: trip.companions.includes(id) ? [] : [id], partySize: 1 });
@@ -31,14 +33,31 @@ export default function PreferencesScreen() {
   };
   const generate = () => {
     if (loading) return;
+    updateTrip({ destinationStops: cityPlan, cityStays: cityPlan.map((destination) => trip.cityStays.find((stay) => stay.code === destination.code) ?? createCityStay(destination.city, destination.code, trip)) });
     setLoading(true);
     router.push('/accommodation');
+  };
+  const changeNights = (index: number, delta: number) => {
+    if (cityPlan.length < 2) return;
+    const next = cityPlan.map((item) => ({ ...item }));
+    if (delta > 0) {
+      const donor = next.map((item, donorIndex) => ({ donorIndex, nights: item.nights })).filter((item) => item.donorIndex !== index && item.nights > 0).sort((a, b) => b.nights - a.nights)[0];
+      if (!donor) return;
+      next[index].nights += 1; next[donor.donorIndex].nights -= 1;
+    } else {
+      if (next[index].nights <= 0) return;
+      const receiver = index === 0 ? 1 : 0;
+      next[index].nights -= 1; next[receiver].nights += 1;
+    }
+    updateTrip({ destinationStops: next });
   };
   const ctaLabel = loading ? '준비하고 있어요…' : hasItinerary ? itineraryDirty ? '숙소 확인하고 다시 만들기' : '숙소 확인하기' : '숙소 설정하기';
 
   return <View style={styles.screen}>
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(16, insets.top + 12) }]} showsVerticalScrollIndicator={false}>
       <View style={styles.nav}><Pressable accessibilityRole="button" accessibilityLabel="여행 기본 정보로 돌아가기" hitSlop={6} onPress={() => router.replace('/new-trip')} style={styles.back}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable><View style={styles.navCopy}><Text style={styles.navKicker}>2 / 4</Text><Text style={styles.navTitle}>여행 취향</Text></View><View style={styles.progress}><View style={styles.progressFill} /></View><View style={styles.homeSlot}><TripsHomeButton /></View></View>
+
+      {cityPlan.length > 1 ? <View style={styles.citySection}><View style={styles.citySectionHeader}><View style={styles.citySectionIcon}><Ionicons name="git-branch-outline" size={20} color={colors.primaryDark} /></View><View style={styles.grow}><Text style={styles.citySectionTitle}>도시별 숙박을 나눠주세요</Text><Text style={styles.citySectionCopy}>총 {totalNights}박을 이동 순서에 맞춰 배분해요.</Text></View></View><View style={styles.cityRoute}>{cityPlan.map((item, index) => <View key={item.code} style={styles.cityRouteItem}><View style={styles.cityRouteOrder}><Text style={styles.cityRouteOrderText}>{index + 1}</Text></View><Text style={styles.cityRouteText}>{item.city}</Text>{index < cityPlan.length - 1 ? <Ionicons name="arrow-forward" size={13} color={colors.textMuted} /> : null}</View>)}</View><View style={styles.cityNightList}>{cityPlan.map((item, index) => <View key={item.code} style={styles.cityNightRow}><View style={styles.cityNightCopy}><Text style={styles.cityNightName}>{item.city}</Text><Text style={styles.cityNightHint}>{item.nights ? `${item.nights}박 동안 베이스캠프` : '숙박 없이 당일 방문'}</Text></View><View style={styles.cityCounter}><Pressable accessibilityLabel={`${item.city} 숙박 줄이기`} onPress={() => changeNights(index, -1)} style={styles.cityCountButton}><Text style={styles.cityCountButtonText}>−</Text></Pressable><Text style={styles.cityCountValue}>{item.nights}박</Text><Pressable accessibilityLabel={`${item.city} 숙박 늘리기`} onPress={() => changeNights(index, 1)} style={styles.cityCountButton}><Text style={styles.cityCountButtonText}>＋</Text></Pressable></View></View>)}</View></View> : null}
 
       <Question number="01" title="이번 여행, 누구와 함께하나요?" copy="여러 명을 함께 선택해도 좋아요." />
       <View style={styles.peopleGrid}>{companions.map((item) => { const selected = trip.companions.includes(item.id); return <Pressable key={item.id} onPress={() => toggleCompanion(item.id)} style={styles.person}><View style={[styles.personAvatar, selected && styles.personSelected]}><Text style={styles.personIcon}>{item.icon}</Text>{selected ? <View style={styles.check}><Text style={styles.checkText}>✓</Text></View> : null}</View><Text style={[styles.personLabel, selected && styles.personLabelSelected]}>{item.label}</Text></Pressable>; })}</View>
@@ -63,9 +82,13 @@ export default function PreferencesScreen() {
 
 function Question({ number, title, copy }: { number: string; title: string; copy: string }) { return <View style={styles.question}><Text style={styles.questionNumber}>{number}</Text><View style={styles.questionCopy}><Text style={styles.questionTitle}>{title}</Text><Text style={styles.questionCaption}>{copy}</Text></View></View>; }
 
+function getNightCount(startDate: string, endDate: string) { return Math.max(1, Math.round((new Date(`${endDate}T12:00:00`).getTime() - new Date(`${startDate}T12:00:00`).getTime()) / 86400000)); }
+function normalizeNights(items: TripDestination[], total: number) { if (!items.length) return []; if (items.reduce((sum, item) => sum + item.nights, 0) === total) return items; const base = Math.floor(total / items.length); const remainder = total % items.length; return items.map((item, index) => ({ ...item, nights: base + (index < remainder ? 1 : 0) })); }
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#FFF' }, content: { width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 120 },
+  screen: { flex: 1, backgroundColor: '#FFF' }, content: { width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 120 }, grow: { flex: 1, minWidth: 0 },
   nav: { minHeight: responsive.headerControlSize, flexDirection: 'row', alignItems: 'center', marginBottom: 38 }, back: { width: responsive.headerControlSize, height: responsive.headerControlSize, borderRadius: responsive.headerControlSize / 2, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center', marginRight: 12 }, navCopy: { flex: 1, minWidth: 0, minHeight: responsive.headerControlSize, justifyContent: 'center' }, navKicker: { color: colors.primary, fontSize: 10, lineHeight: 12, fontWeight: '900' }, navTitle: { color: colors.text, fontSize: 20, lineHeight: 24, fontWeight: '900', marginTop: 2 }, progress: { width: 58, flexShrink: 0, height: 5, borderRadius: 3, backgroundColor: colors.border }, progressFill: { width: '50%', height: '100%', borderRadius: 3, backgroundColor: colors.primary }, homeSlot: { flexShrink: 0, marginLeft: 10 },
+  citySection: { borderRadius: 24, borderWidth: 1, borderColor: '#E4E5FF', backgroundColor: '#F8F8FF', padding: 14, marginBottom: 32 }, citySectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 11 }, citySectionIcon: { width: 44, height: 44, flexShrink: 0, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, citySectionTitle: { color: colors.text, fontSize: 15, fontWeight: '900' }, citySectionCopy: { color: colors.textSecondary, fontSize: 9, lineHeight: 14, marginTop: 3 }, cityRoute: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 7, marginTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border }, cityRouteItem: { flexDirection: 'row', alignItems: 'center', gap: 5 }, cityRouteOrder: { width: 23, height: 23, borderRadius: 8, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' }, cityRouteOrderText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900' }, cityRouteText: { color: colors.text, fontSize: 10, fontWeight: '900' }, cityNightList: { gap: 8, marginTop: 12 }, cityNightRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, backgroundColor: '#FFFFFF', padding: 9, paddingLeft: 13 }, cityNightCopy: { flex: 1, minWidth: 0 }, cityNightName: { color: colors.text, fontSize: 12, fontWeight: '900' }, cityNightHint: { color: colors.textSecondary, fontSize: 8, marginTop: 3 }, cityCounter: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', gap: 7 }, cityCountButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, cityCountButtonText: { color: colors.text, fontSize: 17 }, cityCountValue: { minWidth: 34, textAlign: 'center', color: colors.primaryDark, fontSize: 11, fontWeight: '900' },
   question: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 20 }, questionNumber: { color: colors.primary, fontSize: 11, fontWeight: '900', paddingTop: 4 }, questionCopy: { flex: 1 }, questionTitle: { color: colors.text, fontSize: 21, lineHeight: 28, fontWeight: '900', letterSpacing: -0.5 }, questionCaption: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5 },
   peopleGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 14, paddingBottom: 4 }, person: { flexBasis: 58, flexGrow: 1, maxWidth: 96, minWidth: 0, alignItems: 'center', gap: 8 }, personAvatar: { width: 62, height: 62, maxWidth: '100%', aspectRatio: 1, borderRadius: 22, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' }, personSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary }, personIcon: { fontSize: 25 }, personLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' }, personLabelSelected: { color: colors.primary, fontWeight: '900' }, check: { position: 'absolute', right: -2, top: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' }, checkText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
   countRow: { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceSubtle, borderRadius: 18, padding: 12, paddingLeft: 16 }, countLabel: { color: colors.text, fontSize: 13, fontWeight: '800' }, counter: { flexDirection: 'row', alignItems: 'center', gap: 12 }, countButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }, countButtonText: { color: colors.text, fontSize: 17 }, countValue: { minWidth: 30, textAlign: 'center', color: colors.text, fontSize: 14, fontWeight: '900' },
