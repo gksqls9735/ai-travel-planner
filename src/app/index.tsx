@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { getScreenPadding, responsive } from '@/features/layout/responsive';
 import { colors, shadow, spacing } from '@/features/trip/theme';
@@ -28,7 +29,7 @@ type SavedTrip = {
   palette: { background: string; accent: string };
 };
 
-const savedTrips: SavedTrip[] = [
+const sampleTrips: SavedTrip[] = [
   { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', accommodationName: '도쿄 스테이션 호텔', accommodationAddress: '도쿄 중앙역 도보 4분', inboundDepartureTime: '10:10', inboundArrivalTime: '12:30', outboundDepartureTime: '18:10', outboundArrivalTime: '20:45', palette: { background: '#242943', accent: '#858CFF' } },
   { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', accommodationName: '오사카 가든 스테이', accommodationAddress: '오사카 문화지구 중심', inboundDepartureTime: '08:20', inboundArrivalTime: '10:05', outboundDepartureTime: '19:30', outboundArrivalTime: '21:25', palette: { background: '#315B57', accent: '#8BD8C4' } },
   { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', accommodationName: '파리 리버사이드 호텔', accommodationAddress: '파리 강변 산책로 인근', inboundDepartureTime: '11:45', inboundArrivalTime: '18:10', outboundDepartureTime: '20:25', outboundArrivalTime: '16:40', palette: { background: '#704C55', accent: '#F4B7B8' } },
@@ -39,6 +40,8 @@ export default function MyTripsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { loadTrip, startNewTrip } = useTrip();
+  const [savedTrips, setSavedTrips] = useState<SavedTrip[]>(sampleTrips);
+  const [devMenuOpen, setDevMenuOpen] = useState(false);
   const horizontalPadding = getScreenPadding(width);
   const useTwoColumns = width >= responsive.tabletBreakpoint;
 
@@ -116,10 +119,10 @@ export default function MyTripsScreen() {
           </View>
         ) : (
           <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}><Ionicons name="map-outline" size={30} color={colors.primary} /></View>
+            <View style={styles.emptyVisual}><View style={styles.emptyIcon}><Ionicons name="bag-handle-outline" size={34} color={colors.primary} /></View><View style={styles.emptyPlane}><Ionicons name="airplane" size={14} color="#FFFFFF" /></View></View>
             <Text style={styles.emptyTitle}>아직 저장한 여행이 없어요</Text>
-            <Text style={styles.emptyCopy}>첫 여행 일정을 만들면 이곳에서 다시 볼 수 있어요.</Text>
-            <Pressable onPress={createTrip} style={styles.emptyButton}><Text style={styles.emptyButtonText}>첫 여행 만들기</Text></Pressable>
+            <Text style={styles.emptyCopy}>가고 싶은 도시를 고르고{`\n`}첫 번째 여행을 계획해 보세요.</Text>
+            <Pressable onPress={createTrip} style={styles.emptyButton}><Ionicons name="add" size={18} color="#FFFFFF" /><Text style={styles.emptyButtonText}>첫 여행 만들기</Text></Pressable>
           </View>
         )}
       </ScrollView>
@@ -130,6 +133,10 @@ export default function MyTripsScreen() {
           </Pressable>
         </View>
       ) : null}
+      {Platform.OS === 'web' && __DEV__ ? <View style={[styles.devTools, { bottom: Math.max(insets.bottom, 12) + 16 }]}>
+        {devMenuOpen ? <View style={styles.devPanel}><Text style={styles.devTitle}>EMPTY STATE TEST</Text><Text style={styles.devCopy}>현재 목록: {savedTrips.length}개</Text><Pressable onPress={() => setSavedTrips(sampleTrips)} style={styles.devAction}><Ionicons name="albums-outline" size={16} color={colors.primaryDark} /><Text style={styles.devActionText}>샘플 데이터 추가</Text></Pressable><Pressable onPress={() => setSavedTrips([])} style={[styles.devAction, styles.devReset]}><Ionicons name="refresh-outline" size={16} color={colors.danger} /><Text style={[styles.devActionText, styles.devResetText]}>데이터 리셋</Text></Pressable></View> : null}
+        <Pressable accessibilityLabel="개발 테스트 메뉴" onPress={() => setDevMenuOpen((open) => !open)} style={[styles.devButton, devMenuOpen && styles.devButtonActive]}><Ionicons name="code-slash" size={16} color="#FFFFFF" /><Text style={styles.devButtonText}>DEV</Text></Pressable>
+      </View> : null}
     </View>
   );
 }
@@ -170,13 +177,15 @@ const styles = StyleSheet.create({
   metaItem: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 5 },
   metaDivider: { width: 1, height: 13, backgroundColor: colors.borderStrong },
   metaText: { color: colors.textSecondary, fontSize: 10, fontWeight: '700' },
-  emptyState: { minHeight: 360, borderRadius: 24, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, ...shadow.card },
+  emptyState: { minHeight: 360, borderRadius: 24, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', padding: spacing.lg, ...shadow.card }, emptyVisual: { width: 84, height: 76, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: { width: 64, height: 64, borderRadius: 22, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  emptyPlane: { position: 'absolute', right: 0, top: 0, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.primary, borderWidth: 3, borderColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '900', textAlign: 'center', marginTop: 18 },
   emptyCopy: { maxWidth: 280, color: colors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
-  emptyButton: { minWidth: 160, minHeight: 48, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 22, paddingHorizontal: 18 },
+  emptyButton: { minWidth: 160, minHeight: 48, borderRadius: 16, backgroundColor: colors.primary, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', marginTop: 22, paddingHorizontal: 18 },
   emptyButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
   fabLayer: { position: 'absolute', left: 0, right: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', alignItems: 'flex-end' },
   fab: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center', ...shadow.float },
   fabPressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
+  devTools: { position: 'absolute', left: spacing.md, zIndex: 10, alignItems: 'flex-start', gap: 8 }, devPanel: { width: 230, borderRadius: 18, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: colors.border, padding: 12, ...shadow.float }, devTitle: { color: colors.primary, fontSize: 8, fontWeight: '900', letterSpacing: 1 }, devCopy: { color: colors.textSecondary, fontSize: 9, marginTop: 4, marginBottom: 9 }, devAction: { width: '100%', minHeight: 44, borderRadius: 13, backgroundColor: colors.primarySoft, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 11, marginTop: 6 }, devActionText: { color: colors.primaryDark, fontSize: 10, fontWeight: '900' }, devReset: { backgroundColor: '#FFF2F2' }, devResetText: { color: colors.danger }, devButton: { minWidth: 72, minHeight: 44, borderRadius: 15, backgroundColor: colors.text, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 12, ...shadow.float }, devButtonActive: { backgroundColor: colors.primaryDark }, devButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900' },
 });
