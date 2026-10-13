@@ -21,7 +21,7 @@ const paceOptions: { id: Pace; title: string; caption: string; icon: string }[] 
 ];
 
 export default function PreferencesScreen() {
-  const router = useRouter(); const { trip, updateTrip } = useTrip(); const [loading, setLoading] = useState(false);
+  const router = useRouter(); const { hasItinerary, itineraryDirty, trip, updateTrip } = useTrip(); const [loading, setLoading] = useState(false);
   const insets = useSafeAreaInsets();
   const toggleList = (list: string[], value: string) => list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
   const toggleCompanion = (id: string) => {
@@ -32,12 +32,13 @@ export default function PreferencesScreen() {
   const generate = () => {
     if (loading) return;
     setLoading(true);
-    router.push('/generating');
+    router.push('/accommodation');
   };
+  const ctaLabel = loading ? '준비하고 있어요…' : hasItinerary ? itineraryDirty ? '숙소 확인하고 다시 만들기' : '숙소 확인하기' : '숙소 설정하기';
 
   return <View style={styles.screen}>
     <ScrollView contentContainerStyle={[styles.content, { paddingTop: Math.max(16, insets.top + 12) }]} showsVerticalScrollIndicator={false}>
-      <View style={styles.nav}><Pressable accessibilityRole="button" accessibilityLabel="이전 화면으로" hitSlop={6} onPress={() => router.back()} style={styles.back}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable><View style={styles.navCopy}><Text style={styles.navKicker}>2 / 3</Text><Text style={styles.navTitle}>여행 취향</Text></View><View style={styles.progress}><View style={styles.progressFill} /></View><View style={styles.homeSlot}><TripsHomeButton /></View></View>
+      <View style={styles.nav}><Pressable accessibilityRole="button" accessibilityLabel="여행 기본 정보로 돌아가기" hitSlop={6} onPress={() => router.replace('/new-trip')} style={styles.back}><Ionicons name="arrow-back" size={21} color={colors.text} /></Pressable><View style={styles.navCopy}><Text style={styles.navKicker}>2 / 4</Text><Text style={styles.navTitle}>여행 취향</Text></View><View style={styles.progress}><View style={styles.progressFill} /></View><View style={styles.homeSlot}><TripsHomeButton /></View></View>
 
       <Question number="01" title="이번 여행, 누구와 함께하나요?" copy="여러 명을 함께 선택해도 좋아요." />
       <View style={styles.peopleGrid}>{companions.map((item) => { const selected = trip.companions.includes(item.id); return <Pressable key={item.id} onPress={() => toggleCompanion(item.id)} style={styles.person}><View style={[styles.personAvatar, selected && styles.personSelected]}><Text style={styles.personIcon}>{item.icon}</Text>{selected ? <View style={styles.check}><Text style={styles.checkText}>✓</Text></View> : null}</View><Text style={[styles.personLabel, selected && styles.personLabelSelected]}>{item.label}</Text></Pressable>; })}</View>
@@ -56,7 +57,7 @@ export default function PreferencesScreen() {
       <Question number="04" title="미리 알아둘 것이 있나요?" copy="선택 사항이에요." />
       <View style={styles.extraWrap}>{extras.map((item) => { const selected = trip.requests.includes(item); return <Pressable key={item} onPress={() => updateTrip({ requests: toggleList(trip.requests, item) })} style={[styles.extra, selected && styles.extraSelected]}><Text style={[styles.extraText, selected && styles.extraTextSelected]}>{selected ? '✓  ' : ''}{item}</Text></Pressable>; })}</View>
     </ScrollView>
-    <View style={styles.ctaBar}><Pressable disabled={trip.interests.length < 3 || loading} onPress={generate} style={[styles.cta, (trip.interests.length < 3 || loading) && styles.ctaDisabled]}><Text style={styles.ctaText}>{loading ? '준비하고 있어요…' : '나만의 일정 만들기'}</Text><Text style={styles.ctaIcon}>✦</Text></Pressable></View>
+    <View style={styles.ctaBar}><Pressable disabled={trip.interests.length < 3 || loading} onPress={generate} style={[styles.cta, (trip.interests.length < 3 || loading) && styles.ctaDisabled]}><Text style={styles.ctaText}>{ctaLabel}</Text><Text style={styles.ctaIcon}>→</Text></Pressable></View>
   </View>;
 }
 
@@ -64,7 +65,7 @@ function Question({ number, title, copy }: { number: string; title: string; copy
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#FFF' }, content: { width: '100%', maxWidth: responsive.contentMaxWidth, alignSelf: 'center', paddingHorizontal: spacing.lg, paddingBottom: 120 },
-  nav: { minHeight: responsive.headerControlSize, flexDirection: 'row', alignItems: 'center', marginBottom: 38 }, back: { width: responsive.headerControlSize, height: responsive.headerControlSize, borderRadius: responsive.headerControlSize / 2, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center', marginRight: 12 }, navCopy: { flex: 1, minWidth: 0, minHeight: responsive.headerControlSize, justifyContent: 'center' }, navKicker: { color: colors.primary, fontSize: 10, lineHeight: 12, fontWeight: '900' }, navTitle: { color: colors.text, fontSize: 20, lineHeight: 24, fontWeight: '900', marginTop: 2 }, progress: { width: 58, flexShrink: 0, height: 5, borderRadius: 3, backgroundColor: colors.border }, progressFill: { width: '66%', height: '100%', borderRadius: 3, backgroundColor: colors.primary }, homeSlot: { flexShrink: 0, marginLeft: 10 },
+  nav: { minHeight: responsive.headerControlSize, flexDirection: 'row', alignItems: 'center', marginBottom: 38 }, back: { width: responsive.headerControlSize, height: responsive.headerControlSize, borderRadius: responsive.headerControlSize / 2, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center', marginRight: 12 }, navCopy: { flex: 1, minWidth: 0, minHeight: responsive.headerControlSize, justifyContent: 'center' }, navKicker: { color: colors.primary, fontSize: 10, lineHeight: 12, fontWeight: '900' }, navTitle: { color: colors.text, fontSize: 20, lineHeight: 24, fontWeight: '900', marginTop: 2 }, progress: { width: 58, flexShrink: 0, height: 5, borderRadius: 3, backgroundColor: colors.border }, progressFill: { width: '50%', height: '100%', borderRadius: 3, backgroundColor: colors.primary }, homeSlot: { flexShrink: 0, marginLeft: 10 },
   question: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 20 }, questionNumber: { color: colors.primary, fontSize: 11, fontWeight: '900', paddingTop: 4 }, questionCopy: { flex: 1 }, questionTitle: { color: colors.text, fontSize: 21, lineHeight: 28, fontWeight: '900', letterSpacing: -0.5 }, questionCaption: { color: colors.textSecondary, fontSize: 12, lineHeight: 18, marginTop: 5 },
   peopleGrid: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 10, rowGap: 14, paddingBottom: 4 }, person: { flexBasis: 58, flexGrow: 1, maxWidth: 96, minWidth: 0, alignItems: 'center', gap: 8 }, personAvatar: { width: 62, height: 62, maxWidth: '100%', aspectRatio: 1, borderRadius: 22, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'transparent' }, personSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primary }, personIcon: { fontSize: 25 }, personLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: '700' }, personLabelSelected: { color: colors.primary, fontWeight: '900' }, check: { position: 'absolute', right: -2, top: -2, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, borderWidth: 2, borderColor: '#FFF', alignItems: 'center', justifyContent: 'center' }, checkText: { color: '#FFF', fontSize: 9, fontWeight: '900' },
   countRow: { marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.surfaceSubtle, borderRadius: 18, padding: 12, paddingLeft: 16 }, countLabel: { color: colors.text, fontSize: 13, fontWeight: '800' }, counter: { flexDirection: 'row', alignItems: 'center', gap: 12 }, countButton: { width: 34, height: 34, borderRadius: 12, backgroundColor: '#FFF', alignItems: 'center', justifyContent: 'center' }, countButtonText: { color: colors.text, fontSize: 17 }, countValue: { minWidth: 30, textAlign: 'center', color: colors.text, fontSize: 14, fontWeight: '900' },

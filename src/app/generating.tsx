@@ -17,7 +17,7 @@ const stages = [
 export default function GeneratingScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { trip } = useTrip();
+  const { markItineraryGenerated, trip } = useTrip();
   const [stage, setStage] = useState(0);
   const [pulse] = useState(() => new Animated.Value(0));
   const [progress] = useState(() => new Animated.Value(0));
@@ -32,7 +32,10 @@ export default function GeneratingScreen() {
 
     const stageTwo = setTimeout(() => setStage(1), 850);
     const stageThree = setTimeout(() => setStage(2), 1750);
-    const complete = setTimeout(() => router.replace('/itinerary'), 2850);
+    const complete = setTimeout(() => {
+      markItineraryGenerated();
+      router.replace('/itinerary');
+    }, 2850);
 
     return () => {
       clearTimeout(stageTwo);
@@ -41,7 +44,7 @@ export default function GeneratingScreen() {
       pulseAnimation.stop();
       progress.stopAnimation();
     };
-  }, [progress, pulse, router]);
+  }, [markItineraryGenerated, progress, pulse, router]);
 
   const destination = trip.destination || '도쿄';
   const scale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
@@ -53,7 +56,7 @@ export default function GeneratingScreen() {
     <View style={styles.glowBottom} />
 
     <View style={styles.content}>
-      <View style={styles.stepBadge}><Text style={styles.stepText}>3 / 3</Text></View>
+      <View style={styles.stepBadge}><Text style={styles.stepText}>4 / 4</Text></View>
 
       <View style={styles.visual}>
         <View style={[styles.routeLine, styles.routeLineLeft]} />

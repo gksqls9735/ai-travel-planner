@@ -19,20 +19,22 @@ type SavedTrip = {
   places: number;
   status: '다가오는 여행' | '다녀온 여행';
   symbol: string;
+  accommodationName: string;
+  accommodationAddress: string;
   palette: { background: string; accent: string };
 };
 
 const savedTrips: SavedTrip[] = [
-  { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', palette: { background: '#242943', accent: '#858CFF' } },
-  { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', palette: { background: '#315B57', accent: '#8BD8C4' } },
-  { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', palette: { background: '#704C55', accent: '#F4B7B8' } },
+  { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', accommodationName: '도쿄 스테이션 호텔', accommodationAddress: '도쿄 중앙역 도보 4분', palette: { background: '#242943', accent: '#858CFF' } },
+  { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', accommodationName: '오사카 가든 스테이', accommodationAddress: '오사카 문화지구 중심', palette: { background: '#315B57', accent: '#8BD8C4' } },
+  { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', accommodationName: '파리 리버사이드 호텔', accommodationAddress: '파리 강변 산책로 인근', palette: { background: '#704C55', accent: '#F4B7B8' } },
 ];
 
 export default function MyTripsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { updateTrip } = useTrip();
+  const { loadTrip, startNewTrip } = useTrip();
   const horizontalPadding = getScreenPadding(width);
   const useTwoColumns = width >= responsive.tabletBreakpoint;
 
@@ -42,9 +44,16 @@ export default function MyTripsScreen() {
       destinationCode: savedTrip.code,
       startDate: savedTrip.startDate,
       endDate: savedTrip.endDate,
+      accommodationMode: 'known',
+      accommodationName: savedTrip.accommodationName,
+      accommodationAddress: savedTrip.accommodationAddress,
     };
-    updateTrip(patch);
+    loadTrip(patch);
     router.push('/itinerary');
+  };
+  const createTrip = () => {
+    startNewTrip();
+    router.push('/new-trip');
   };
 
   return (
@@ -102,13 +111,13 @@ export default function MyTripsScreen() {
             <View style={styles.emptyIcon}><Ionicons name="map-outline" size={30} color={colors.primary} /></View>
             <Text style={styles.emptyTitle}>아직 저장한 여행이 없어요</Text>
             <Text style={styles.emptyCopy}>첫 여행 일정을 만들면 이곳에서 다시 볼 수 있어요.</Text>
-            <Pressable onPress={() => router.push('/new-trip')} style={styles.emptyButton}><Text style={styles.emptyButtonText}>첫 여행 만들기</Text></Pressable>
+            <Pressable onPress={createTrip} style={styles.emptyButton}><Text style={styles.emptyButtonText}>첫 여행 만들기</Text></Pressable>
           </View>
         )}
       </ScrollView>
       {savedTrips.length ? (
         <View pointerEvents="box-none" style={[styles.fabLayer, { bottom: Math.max(insets.bottom, 12) + 16, paddingHorizontal: horizontalPadding }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="새 여행 만들기" onPress={() => router.push('/new-trip')} style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="새 여행 만들기" onPress={createTrip} style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}>
             <Ionicons name="add" size={28} color="#FFFFFF" />
           </Pressable>
         </View>

@@ -1,22 +1,61 @@
 import { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
 
 export type Pace = 'relaxed' | 'balanced' | 'packed';
+export type AccommodationMode = 'known' | 'recommend' | 'skip';
 export type TripState = {
   destination: string; destinationCode: string; startDate: string; endDate: string;
   arrivalTime: string; departureTime: string; flightLater: boolean; companions: string[];
   partySize: number; pace: Pace; interests: string[]; requests: string[];
+  accommodationMode: AccommodationMode; accommodationName: string; accommodationAddress: string;
+  checkInTime: string; checkOutTime: string; roomCount: number; accommodationBudget: string;
+  accommodationArea: string; accommodationType: string; accommodationAmenities: string[];
 };
 const initialTrip: TripState = {
   destination: '', destinationCode: '', startDate: '', endDate: '', arrivalTime: '14:30',
   departureTime: '18:10', flightLater: false, companions: [], partySize: 2, pace: 'balanced',
   interests: ['맛집 탐방', '전통 문화', '골목 산책'], requests: [],
+  accommodationMode: 'known', accommodationName: '', accommodationAddress: '', checkInTime: '15:00',
+  checkOutTime: '11:00', roomCount: 1, accommodationBudget: '10~20만원', accommodationArea: '역 근처',
+  accommodationType: '호텔', accommodationAmenities: [],
 };
-type TripContextValue = { trip: TripState; updateTrip: (patch: Partial<TripState>) => void };
+type TripContextValue = {
+  hasItinerary: boolean;
+  itineraryDirty: boolean;
+  loadTrip: (patch: Partial<TripState>) => void;
+  markItineraryGenerated: () => void;
+  startNewTrip: () => void;
+  trip: TripState;
+  updateTrip: (patch: Partial<TripState>) => void;
+};
 const TripContext = createContext<TripContextValue | null>(null);
 
 export function TripProvider({ children }: PropsWithChildren) {
   const [trip, setTrip] = useState(initialTrip);
-  const value = useMemo(() => ({ trip, updateTrip: (patch: Partial<TripState>) => setTrip((current) => ({ ...current, ...patch })) }), [trip]);
+  const [hasItinerary, setHasItinerary] = useState(false);
+  const [itineraryDirty, setItineraryDirty] = useState(false);
+  const value = useMemo(() => ({
+    hasItinerary,
+    itineraryDirty,
+    loadTrip: (patch: Partial<TripState>) => {
+      setTrip({ ...initialTrip, ...patch });
+      setHasItinerary(true);
+      setItineraryDirty(false);
+    },
+    markItineraryGenerated: () => {
+      setHasItinerary(true);
+      setItineraryDirty(false);
+    },
+    startNewTrip: () => {
+      setTrip(initialTrip);
+      setHasItinerary(false);
+      setItineraryDirty(false);
+    },
+    trip,
+    updateTrip: (patch: Partial<TripState>) => {
+      setTrip((current) => ({ ...current, ...patch }));
+      if (hasItinerary) setItineraryDirty(true);
+    },
+  }), [hasItinerary, itineraryDirty, trip]);
   return <TripContext.Provider value={value}>{children}</TripContext.Provider>;
 }
 export function useTrip() {
