@@ -21,13 +21,17 @@ type SavedTrip = {
   symbol: string;
   accommodationName: string;
   accommodationAddress: string;
+  inboundDepartureTime: string;
+  inboundArrivalTime: string;
+  outboundDepartureTime: string;
+  outboundArrivalTime: string;
   palette: { background: string; accent: string };
 };
 
 const savedTrips: SavedTrip[] = [
-  { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', accommodationName: '도쿄 스테이션 호텔', accommodationAddress: '도쿄 중앙역 도보 4분', palette: { background: '#242943', accent: '#858CFF' } },
-  { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', accommodationName: '오사카 가든 스테이', accommodationAddress: '오사카 문화지구 중심', palette: { background: '#315B57', accent: '#8BD8C4' } },
-  { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', accommodationName: '파리 리버사이드 호텔', accommodationAddress: '파리 강변 산책로 인근', palette: { background: '#704C55', accent: '#F4B7B8' } },
+  { id: 'tokyo-autumn', city: '도쿄', country: '일본', code: 'TYO', dates: '2026. 10. 8 — 10. 11', startDate: '2026-10-08', endDate: '2026-10-11', days: 4, places: 12, status: '다가오는 여행', symbol: '東京', accommodationName: '도쿄 스테이션 호텔', accommodationAddress: '도쿄 중앙역 도보 4분', inboundDepartureTime: '10:10', inboundArrivalTime: '12:30', outboundDepartureTime: '18:10', outboundArrivalTime: '20:45', palette: { background: '#242943', accent: '#858CFF' } },
+  { id: 'osaka-spring', city: '오사카', country: '일본', code: 'KIX', dates: '2026. 4. 16 — 4. 19', startDate: '2026-04-16', endDate: '2026-04-19', days: 4, places: 10, status: '다녀온 여행', symbol: '大阪', accommodationName: '오사카 가든 스테이', accommodationAddress: '오사카 문화지구 중심', inboundDepartureTime: '08:20', inboundArrivalTime: '10:05', outboundDepartureTime: '19:30', outboundArrivalTime: '21:25', palette: { background: '#315B57', accent: '#8BD8C4' } },
+  { id: 'paris-winter', city: '파리', country: '프랑스', code: 'CDG', dates: '2025. 12. 20 — 12. 24', startDate: '2025-12-20', endDate: '2025-12-24', days: 5, places: 15, status: '다녀온 여행', symbol: 'PARIS', accommodationName: '파리 리버사이드 호텔', accommodationAddress: '파리 강변 산책로 인근', inboundDepartureTime: '11:45', inboundArrivalTime: '18:10', outboundDepartureTime: '20:25', outboundArrivalTime: '16:40', palette: { background: '#704C55', accent: '#F4B7B8' } },
 ];
 
 export default function MyTripsScreen() {
@@ -47,6 +51,10 @@ export default function MyTripsScreen() {
       accommodationMode: 'known',
       accommodationName: savedTrip.accommodationName,
       accommodationAddress: savedTrip.accommodationAddress,
+      inboundDepartureTime: savedTrip.inboundDepartureTime,
+      inboundArrivalTime: savedTrip.inboundArrivalTime,
+      outboundDepartureTime: savedTrip.outboundDepartureTime,
+      outboundArrivalTime: savedTrip.outboundArrivalTime,
     };
     loadTrip(patch);
     router.push('/itinerary');
