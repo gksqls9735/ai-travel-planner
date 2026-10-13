@@ -6,13 +6,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripMap } from '@/features/trip/trip-map';
 import { PlaceDetailModal } from '@/features/trip/place-detail-modal';
 import { PlaceReplacementSheet, ReplacementCandidate } from '@/features/trip/place-replacement-sheet';
+import { TransportId, TransportOption, TransportSelectionSheet } from '@/features/trip/transport-selection-sheet';
 import { useTrip } from '@/features/trip/trip-context';
 import { responsive } from '@/features/layout/responsive';
+import { TripsHomeButton } from '@/features/navigation/trips-home-button';
 import { colors, shadow, spacing } from '@/features/trip/theme';
 
 type Stop = { time: string; name: string; category: string; duration: string; icon: string; alt: string[] };
 type SelectedPlace = { day: number; index: number; stop: Stop };
 type ReplacementRequest = { day: number; index: number; returnToDetail: boolean };
+type TransportRequest = { day: number; index: number };
 type WebPointerGestureEvent = {
   preventDefault: () => void;
   currentTarget: {
@@ -28,10 +31,28 @@ const plans: Stop[][] = [
   [{ time: '09:30', name: '다이칸야마 산책', category: '골목 산책', duration: '1시간 30분', icon: '🚶', alt: ['나카메구로 산책', '지유가오카'] }, { time: '12:00', name: '에비스 로컬 런치', category: '맛집', duration: '1시간', icon: '🍱', alt: ['다이칸야마 브런치', '시부야 라멘'] }],
 ];
 
+const transitMinutes = [18, 24, 16, 22];
+const transitDetails = ['긴자선 이용 · 환승 없음', '히비야선 이용 · 환승 1회', 'JR 야마노테선 · 환승 없음', '도에이선 이용 · 환승 1회'];
+
+function getTransportOptions(dayIndex: number, legIndex: number): TransportOption[] {
+  const base = transitMinutes[(dayIndex + legIndex) % transitMinutes.length];
+  return [
+    { id: 'transit', label: '대중교통', minutes: base, detail: transitDetails[(dayIndex + legIndex) % transitDetails.length], price: `약 ${180 + ((dayIndex + legIndex) % 3) * 40}엔` },
+    { id: 'taxi', label: '택시', minutes: Math.max(7, base - 8), detail: '교통 상황에 따라 달라질 수 있어요', price: `약 ${1200 + ((dayIndex + legIndex) % 3) * 300}엔`, note: '짐이 많거나 부모님과 함께라면 편해요' },
+    { id: 'walk', label: '도보', minutes: base + 14, detail: `${(1.8 + ((dayIndex + legIndex) % 3) * 0.3).toFixed(1)}km · 평탄한 길 위주`, price: '무료' },
+  ];
+}
+
+function shiftTime(value: string, delta: number) {
+  const [hours, minutes] = value.split(':').map(Number);
+  const total = (hours * 60 + minutes + delta + 24 * 60) % (24 * 60);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
 export default function ItineraryScreen() {
   const router = useRouter(); const { trip } = useTrip();
   const insets = useSafeAreaInsets();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const mapHeight = Math.max(360, height * 0.48);
   const snapPoints = useMemo(() => ({
     expanded: Math.max(92, height * 0.11),
@@ -44,7 +65,7 @@ export default function ItineraryScreen() {
   const webDragStartY = useRef(0);
   const webDragDeltaY = useRef(0);
   const isWebDragging = useRef(false);
-  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null); const [replacementRequest, setReplacementRequest] = useState<ReplacementRequest | null>(null); const [toast, setToast] = useState('');
+  const [day, setDay] = useState(0); const [stops, setStops] = useState(plans); const [locked, setLocked] = useState<string[]>([]); const [selectedPlace, setSelectedPlace] = useState<SelectedPlace | null>(null); const [replacementRequest, setReplacementRequest] = useState<ReplacementRequest | null>(null); const [transportRequest, setTransportRequest] = useState<TransportRequest | null>(null); const [transportChoices, setTransportChoices] = useState<Record<string, TransportId>>({}); const [toast, setToast] = useState('');
   const applyReplacement = (candidate: ReplacementCandidate) => {
     if (!replacementRequest) return;
     const { day: targetDay, index, returnToDetail } = replacementRequest;
@@ -57,6 +78,18 @@ export default function ItineraryScreen() {
     notify(`“${nextStop.name}”으로 바꿨어요.`);
   };
   const notify = (message: string) => { setToast(message); setTimeout(() => setToast(''), 2000); };
+  const selectTransport = (option: TransportOption) => {
+    if (!transportRequest) return;
+    const { day: targetDay, index } = transportRequest;
+    const key = `${targetDay}-${index}`;
+    const options = getTransportOptions(targetDay, index);
+    const previous = options.find((item) => item.id === (transportChoices[key] ?? 'transit')) ?? options[0];
+    const delta = option.minutes - previous.minutes;
+    setTransportChoices((current) => ({ ...current, [key]: option.id }));
+    if (delta) setStops((all) => all.map((list, listIndex) => listIndex === targetDay ? list.map((stop, stopIndex) => stopIndex > index ? { ...stop, time: shiftTime(stop.time, delta) } : stop) : list));
+    setTransportRequest(null);
+    notify(`${option.label} ${option.minutes}분으로 변경했어요.`);
+  };
   const snapSheet = (top: number) => {
     Animated.spring(sheetTop, { toValue: top, useNativeDriver: false, damping: 24, stiffness: 240, mass: 0.8 }).start();
   };
@@ -144,13 +177,15 @@ export default function ItineraryScreen() {
               <Pressable disabled={isLocked} onPress={() => setReplacementRequest({ day, index, returnToDetail: false })} style={[styles.regenerate, isLocked && styles.disabled]}><Text style={styles.regenerateText}>↻  이 장소 대신 다른 곳 추천</Text></Pressable>
             </View>
           </View>
-          {index < stops[day].length - 1 ? <View style={styles.transit}><Text style={styles.transitIcon}>⌁</Text><Text style={styles.transitText}>대중교통으로 {index % 2 ? '24분' : '18분'}</Text></View> : null}
+          {index < stops[day].length - 1 ? (() => { const options = getTransportOptions(day, index); const selected = options.find((option) => option.id === (transportChoices[`${day}-${index}`] ?? 'transit')) ?? options[0]; const iconName = selected.id === 'transit' ? 'subway-outline' : selected.id === 'taxi' ? 'car-outline' : 'walk-outline'; return <View style={styles.transit}><View style={styles.transitRail}><View style={styles.transitRailLine} /><View style={styles.transitJunction} /></View><View style={styles.transitBranch} /><Pressable accessibilityRole="button" accessibilityLabel={`${selected.label} ${selected.minutes}분, 다른 이동수단 보기`} onPress={() => setTransportRequest({ day, index })} style={({ pressed }) => [styles.transitButton, pressed && styles.transitButtonPressed]}><Ionicons name={iconName} size={14} color={colors.primaryDark} /><Text style={styles.transitText}>{selected.label} {selected.minutes}분</Text><Ionicons name="chevron-down" size={13} color={colors.primaryDark} /></Pressable></View>; })() : null}
         </View>; })}
         <Pressable onPress={() => notify('장소 추가 기능은 준비 중이에요.')} style={styles.add}><Text style={styles.addText}>＋ 일정에 장소 추가</Text></Pressable><View style={styles.bottomSpace} />
       </ScrollView>
     </Animated.View>
     <PlaceDetailModal destination={trip.destination || '도쿄'} isLocked={selectedPlace ? locked.includes(`${selectedPlace.day}-${selectedPlace.index}`) : false} onClose={() => setSelectedPlace(null)} onKeep={() => { if (!selectedPlace) return; const key = `${selectedPlace.day}-${selectedPlace.index}`; setLocked((items) => items.includes(key) ? items : [...items, key]); notify('이 장소를 일정에 유지할게요.'); setSelectedPlace(null); }} onRegenerate={() => { if (!selectedPlace) return; setReplacementRequest({ day: selectedPlace.day, index: selectedPlace.index, returnToDetail: true }); }} place={replacementRequest ? null : selectedPlace?.stop ?? null} />
     <PlaceReplacementSheet onClose={() => setReplacementRequest(null)} onSelect={applyReplacement} place={replacementRequest ? stops[replacementRequest.day]?.[replacementRequest.index] ?? null : null} />
+    <TransportSelectionSheet from={transportRequest ? stops[transportRequest.day]?.[transportRequest.index]?.name ?? '' : ''} onClose={() => setTransportRequest(null)} onSelect={selectTransport} options={transportRequest ? getTransportOptions(transportRequest.day, transportRequest.index) : []} selectedId={transportRequest ? transportChoices[`${transportRequest.day}-${transportRequest.index}`] ?? 'transit' : 'transit'} to={transportRequest ? stops[transportRequest.day]?.[transportRequest.index + 1]?.name ?? '' : ''} visible={Boolean(transportRequest)} />
+    <View style={[styles.homeFab, { bottom: Math.max(insets.bottom, 12) + 16, right: Math.max(spacing.md, (width - 760) / 2 + spacing.md) }]}><TripsHomeButton size={56} /></View>
     {toast ? <View style={styles.toast}><Text style={styles.toastText}>✓  {toast}</Text></View> : null}
   </View>;
 }
@@ -163,5 +198,5 @@ const styles = StyleSheet.create({
   daysScroll: { flexGrow: 0, maxHeight: 90 }, days: { paddingHorizontal: spacing.lg, gap: 8, paddingTop: 18, paddingBottom: 14 }, day: { width: 72, height: 58, borderRadius: 17, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, dayActive: { backgroundColor: colors.primary }, dayName: { color: colors.textSecondary, fontSize: 11, fontWeight: '800' }, dayNameActive: { color: '#FFF' }, dayDate: { color: colors.textMuted, fontSize: 9, marginTop: 3 }, dayDateActive: { color: '#DDE0FF' },
   timeline: { flex: 1, borderTopWidth: 1, borderTopColor: colors.border }, timelineContent: { paddingHorizontal: spacing.lg, paddingTop: 22 }, stop: { flexDirection: 'row', gap: 12 }, timeColumn: { width: 48, alignItems: 'center' }, time: { color: colors.text, fontSize: 11, fontWeight: '900', marginBottom: 8 }, dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary, borderWidth: 3, borderColor: colors.primarySoft }, line: { width: 2, flex: 1, minHeight: 92, backgroundColor: colors.border, marginTop: 4 },
   stopContent: { flex: 1, paddingBottom: 8 }, stopTop: { flexDirection: 'row', alignItems: 'center', gap: 8 }, placeSummary: { flex: 1, minWidth: 0, minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 11 }, placeIcon: { width: 44, height: 44, flexShrink: 0, borderRadius: 15, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }, placeEmoji: { fontSize: 20 }, placeCopy: { flex: 1, minWidth: 0 }, placeName: { color: colors.text, fontSize: 14, lineHeight: 20, fontWeight: '900' }, placeMeta: { color: colors.textSecondary, fontSize: 10, marginTop: 4 }, lock: { width: 36, height: 36, flexShrink: 0, borderRadius: 13, backgroundColor: colors.surfaceSubtle, alignItems: 'center', justifyContent: 'center' }, lockActive: { backgroundColor: colors.primarySoft }, regenerate: { alignSelf: 'flex-start', minHeight: 34, marginTop: 11, borderRadius: 12, backgroundColor: colors.surfaceSubtle, paddingHorizontal: 11, alignItems: 'center', justifyContent: 'center' }, regenerateText: { color: colors.primaryDark, fontSize: 10, fontWeight: '800' }, disabled: { opacity: 0.4 },
-  transit: { marginLeft: 60, flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9 }, transitIcon: { color: colors.textMuted, fontSize: 15 }, transitText: { color: colors.textMuted, fontSize: 10, fontWeight: '700' }, add: { minHeight: 48, marginLeft: 60, marginTop: 12, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.primary, fontSize: 11, fontWeight: '900' }, bottomSpace: { height: 28 }, toast: { position: 'absolute', bottom: 24, alignSelf: 'center', backgroundColor: colors.text, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 12, zIndex: 5 }, toastText: { color: '#FFF', fontSize: 11, fontWeight: '800' },
+  transit: { minHeight: 62, flexDirection: 'row', alignItems: 'flex-start' }, transitRail: { width: 48, height: '100%', flexShrink: 0, alignItems: 'center' }, transitRailLine: { position: 'absolute', top: 0, bottom: 0, width: 2, backgroundColor: colors.border }, transitJunction: { width: 8, height: 8, marginTop: 8, borderRadius: 4, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: colors.primary }, transitBranch: { width: 38, height: 2, flexShrink: 0, marginLeft: -24, marginTop: 11, backgroundColor: colors.borderStrong }, transitButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 14, backgroundColor: colors.primarySoft, paddingHorizontal: 11, transform: [{ translateY: -10 }] }, transitButtonPressed: { opacity: 0.7 }, transitText: { color: colors.primaryDark, fontSize: 10, fontWeight: '800' }, add: { minHeight: 48, marginLeft: 60, marginTop: 12, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.borderStrong, alignItems: 'center', justifyContent: 'center' }, addText: { color: colors.primary, fontSize: 11, fontWeight: '900' }, bottomSpace: { height: 104 }, homeFab: { position: 'absolute', zIndex: 4 }, toast: { position: 'absolute', bottom: 24, alignSelf: 'center', backgroundColor: colors.text, borderRadius: 24, paddingHorizontal: 18, paddingVertical: 12, zIndex: 5 }, toastText: { color: '#FFF', fontSize: 11, fontWeight: '800' },
 });

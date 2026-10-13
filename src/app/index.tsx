@@ -50,7 +50,7 @@ export default function MyTripsScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top, 12) + 8, paddingHorizontal: horizontalPadding }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top, 12) + 8, paddingHorizontal: horizontalPadding, paddingBottom: 128 + insets.bottom }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -59,9 +59,6 @@ export default function MyTripsScreen() {
             <Text style={styles.eyebrow}>MY TRIPS</Text>
             <Text style={styles.title}>내 여행 보관함</Text>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="새 여행 만들기" onPress={() => router.push('/new-trip')} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
-          </Pressable>
         </View>
 
         <View style={styles.intro}>
@@ -109,13 +106,20 @@ export default function MyTripsScreen() {
           </View>
         )}
       </ScrollView>
+      {savedTrips.length ? (
+        <View pointerEvents="box-none" style={[styles.fabLayer, { bottom: Math.max(insets.bottom, 12) + 16, paddingHorizontal: horizontalPadding }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="새 여행 만들기" onPress={() => router.push('/new-trip')} style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}>
+            <Ionicons name="add" size={28} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  scrollContent: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingBottom: 48 },
+  scrollContent: { width: '100%', maxWidth: 1080, alignSelf: 'center' },
   header: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 12 },
   brandMark: { width: 48, height: 48, flexShrink: 0, borderRadius: 17, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   brandMarkText: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
@@ -123,7 +127,6 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, minWidth: 0 },
   eyebrow: { color: colors.primary, fontSize: 9, lineHeight: 12, fontWeight: '900', letterSpacing: 1.4 },
   title: { color: colors.text, fontSize: 20, lineHeight: 27, fontWeight: '900', marginTop: 1 },
-  addButton: { width: 48, height: 48, flexShrink: 0, borderRadius: 24, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', ...shadow.card },
   intro: { marginTop: 40, marginBottom: 24 },
   introTitle: { color: colors.text, fontSize: 29, lineHeight: 38, fontWeight: '900', letterSpacing: -0.8 },
   introCopy: { maxWidth: 520, color: colors.textSecondary, fontSize: 13, lineHeight: 20, marginTop: 10 },
@@ -156,4 +159,7 @@ const styles = StyleSheet.create({
   emptyCopy: { maxWidth: 280, color: colors.textSecondary, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7 },
   emptyButton: { minWidth: 160, minHeight: 48, borderRadius: 16, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 22, paddingHorizontal: 18 },
   emptyButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: '900' },
+  fabLayer: { position: 'absolute', left: 0, right: 0, width: '100%', maxWidth: 1080, alignSelf: 'center', alignItems: 'flex-end' },
+  fab: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.primary, borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)', alignItems: 'center', justifyContent: 'center', ...shadow.float },
+  fabPressed: { opacity: 0.88, transform: [{ scale: 0.96 }] },
 });
