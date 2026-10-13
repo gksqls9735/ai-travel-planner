@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { responsive } from '@/features/layout/responsive';
 import { colors, shadow, spacing } from '@/features/trip/theme';
+import { SkeletonBlock, SkeletonGroup } from '@/features/trip/skeleton';
 
 export type PlaceSummary = {
   name: string;
@@ -46,6 +48,14 @@ export function PlaceDetailModal({ bookingStatus, destination, isLocked, onClose
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const desktop = width >= responsive.tabletBreakpoint;
+  const [loadedPlaceName, setLoadedPlaceName] = useState<string | null>(null);
+  const loading = Boolean(place && loadedPlaceName !== place.name);
+
+  useEffect(() => {
+    if (!place) return;
+    const timer = setTimeout(() => setLoadedPlaceName(place.name), 480);
+    return () => clearTimeout(timer);
+  }, [place]);
 
   if (!place) return null;
   const bookingRequirement = place.bookingRequirement ?? 'none';
@@ -71,6 +81,7 @@ export function PlaceDetailModal({ bookingStatus, destination, isLocked, onClose
         </View>
 
         <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          {loading ? <PlaceDetailSkeleton /> : <>
           <View style={styles.placeHero}>
             <View style={styles.placeIcon}><Text style={styles.placeEmoji}>{place.icon}</Text></View>
             <View style={styles.placeCopy}>
@@ -97,19 +108,29 @@ export function PlaceDetailModal({ bookingStatus, destination, isLocked, onClose
             <Text style={styles.bookingSource}>현재는 샘플 분류이며 실제 예약 정책은 공식 페이지에서 확인해야 해요.</Text>
             {bookingRequirement !== 'none' ? <View style={styles.bookingActions}><Pressable accessibilityRole="button" onPress={onOpenBooking} style={({ pressed }) => [styles.bookingLink, pressed && styles.bookingPressed]}><Ionicons name="open-outline" size={16} color="#FFFFFF" /><Text style={styles.bookingLinkText}>{bookingStatus ? '예약 내역 보기' : '예약 페이지로 이동'}</Text></Pressable><Pressable accessibilityRole="button" onPress={onToggleBooking} style={({ pressed }) => [styles.bookingState, pressed && styles.bookingPressed]}><Ionicons name={bookingStatus ? 'refresh-outline' : 'checkmark-circle-outline'} size={16} color={colors.primaryDark} /><Text style={styles.bookingStateText}>{bookingStatus ? '예약 완료 취소' : '예약 완료로 표시'}</Text></Pressable></View> : null}
           </View>
+          </>}
         </ScrollView>
 
-        <View style={styles.actions}>
+        {loading ? <View style={styles.actions}><SkeletonBlock style={styles.actionSkeleton} /><SkeletonBlock style={styles.actionSkeleton} /></View> : <View style={styles.actions}>
           <Pressable accessibilityRole="button" disabled={isLocked} onPress={onRegenerate} style={[styles.secondaryButton, isLocked && styles.buttonDisabled]}>
             <Ionicons name="refresh" size={17} color={colors.primaryDark} /><Text style={styles.secondaryText}>다른 장소 추천</Text>
           </Pressable>
           <Pressable accessibilityRole="button" disabled={isLocked} onPress={onKeep} style={[styles.primaryButton, isLocked && styles.buttonDisabled]}>
             <Ionicons name={isLocked ? 'lock-closed' : 'checkmark'} size={18} color="#FFFFFF" /><Text style={styles.primaryText}>{isLocked ? '일정에 유지 중' : '이 장소 유지'}</Text>
           </Pressable>
-        </View>
+        </View>}
       </View>
     </View>
   </Modal>;
+}
+
+function PlaceDetailSkeleton() {
+  return <SkeletonGroup style={styles.skeletonBody}>
+    <View style={styles.skeletonHero}><SkeletonBlock style={styles.skeletonIcon} /><View style={styles.skeletonCopy}><SkeletonBlock style={styles.skeletonTag} /><SkeletonBlock style={styles.skeletonTitle} /><SkeletonBlock style={styles.skeletonShort} /></View></View>
+    <SkeletonBlock style={styles.skeletonLine} /><SkeletonBlock style={styles.skeletonLineWide} />
+    <View style={styles.skeletonGrid}><SkeletonBlock style={styles.skeletonInfo} /><SkeletonBlock style={styles.skeletonInfo} /></View>
+    <SkeletonBlock style={styles.skeletonCard} /><SkeletonBlock style={styles.skeletonBooking} />
+  </SkeletonGroup>;
 }
 
 const styles = StyleSheet.create({
@@ -168,4 +189,5 @@ const styles = StyleSheet.create({
   primaryButton: { flex: 1, minWidth: 0, minHeight: 50, borderRadius: 17, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   primaryText: { color: '#FFFFFF', fontSize: 11, fontWeight: '900' },
   buttonDisabled: { opacity: 0.55 },
+  skeletonBody: { gap: 10 }, skeletonHero: { flexDirection: 'row', alignItems: 'center', gap: 14 }, skeletonIcon: { width: 64, height: 64, flexShrink: 0, borderRadius: 22 }, skeletonCopy: { flex: 1, minWidth: 0, gap: 7 }, skeletonTag: { width: 84, height: 19, borderRadius: 7 }, skeletonTitle: { width: '78%', height: 22, borderRadius: 8 }, skeletonShort: { width: 72, height: 12, borderRadius: 6 }, skeletonLine: { width: '94%', height: 13, borderRadius: 7, marginTop: 12 }, skeletonLineWide: { width: '72%', height: 13, borderRadius: 7 }, skeletonGrid: { flexDirection: 'row', gap: 10, marginTop: 8 }, skeletonInfo: { flex: 1, minWidth: 0, height: 100, borderRadius: 18 }, skeletonCard: { height: 82, borderRadius: 18, marginTop: 2 }, skeletonBooking: { height: 118, borderRadius: 19 }, actionSkeleton: { flex: 1, minWidth: 0, height: 50, borderRadius: 17 },
 });
