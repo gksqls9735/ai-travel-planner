@@ -4,6 +4,16 @@ export type Pace = 'relaxed' | 'balanced' | 'packed';
 export type AccommodationMode = 'known' | 'recommend' | 'skip';
 export type BookingStatus = 'required' | 'booked';
 export type TripDestination = { city: string; code: string; nights: number };
+export type PackingChecklistCategory = string;
+export type PackingChecklistCustomCategory = { id: string; label: string };
+export type PackingChecklistItem = {
+  id: string;
+  category: PackingChecklistCategory;
+  label: string;
+  checked: boolean;
+  aiRecommended?: boolean;
+  custom?: boolean;
+};
 export type CityStay = {
   city: string; code: string; mode: Exclude<AccommodationMode, 'skip'>;
   accommodationName: string; accommodationAddress: string; bookingStatus: BookingStatus;
@@ -20,6 +30,9 @@ export type TripState = {
   accommodationBookingStatus: BookingStatus;
   checkInTime: string; checkOutTime: string; roomCount: number; accommodationBudget: string;
   accommodationArea: string; accommodationType: string; accommodationAmenities: string[];
+  packingChecklist: PackingChecklistItem[];
+  packingChecklistCategories: PackingChecklistCustomCategory[];
+  packingChecklistInitialized: boolean;
 };
 const initialTrip: TripState = {
   destination: '', destinationCode: '', startDate: '', endDate: '', inboundDepartureTime: '10:10',
@@ -30,6 +43,9 @@ const initialTrip: TripState = {
   accommodationMode: 'known', accommodationName: '', accommodationAddress: '', accommodationBookingStatus: 'required', checkInTime: '15:00',
   checkOutTime: '11:00', roomCount: 1, accommodationBudget: '10~20만원', accommodationArea: '역 근처',
   accommodationType: '호텔', accommodationAmenities: [],
+  packingChecklist: [],
+  packingChecklistCategories: [],
+  packingChecklistInitialized: false,
 };
 type TripContextValue = {
   hasItinerary: boolean;
@@ -74,7 +90,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     trip,
     updateTrip: (patch: Partial<TripState>) => {
       setTrip((current) => ({ ...current, ...patch }));
-      const changesItinerary = Object.keys(patch).some((key) => key !== 'accommodationBookingStatus');
+      const changesItinerary = Object.keys(patch).some((key) => !['accommodationBookingStatus', 'packingChecklist', 'packingChecklistCategories', 'packingChecklistInitialized'].includes(key));
       if (hasItinerary && changesItinerary) setItineraryDirty(true);
     },
   }), [hasItinerary, itineraryDirty, trip]);
