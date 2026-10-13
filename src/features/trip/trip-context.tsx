@@ -14,6 +14,16 @@ export type PackingChecklistItem = {
   aiRecommended?: boolean;
   custom?: boolean;
 };
+export type TravelExpenseCategory = 'food' | 'transport' | 'ticket' | 'shopping' | 'lodging' | 'other';
+export type TravelExpense = {
+  id: string;
+  amount: number;
+  category: TravelExpenseCategory;
+  currencyCode: string;
+  day: number;
+  note: string;
+  placeName: string;
+};
 export type CityStay = {
   city: string; code: string; mode: Exclude<AccommodationMode, 'skip'>;
   accommodationName: string; accommodationAddress: string; bookingStatus: BookingStatus;
@@ -33,6 +43,8 @@ export type TripState = {
   packingChecklist: PackingChecklistItem[];
   packingChecklistCategories: PackingChecklistCustomCategory[];
   packingChecklistInitialized: boolean;
+  travelBudget: number;
+  travelExpenses: TravelExpense[];
 };
 const initialTrip: TripState = {
   destination: '', destinationCode: '', startDate: '', endDate: '', inboundDepartureTime: '10:10',
@@ -46,6 +58,8 @@ const initialTrip: TripState = {
   packingChecklist: [],
   packingChecklistCategories: [],
   packingChecklistInitialized: false,
+  travelBudget: 0,
+  travelExpenses: [],
 };
 type TripContextValue = {
   hasItinerary: boolean;
@@ -90,7 +104,7 @@ export function TripProvider({ children }: PropsWithChildren) {
     trip,
     updateTrip: (patch: Partial<TripState>) => {
       setTrip((current) => ({ ...current, ...patch }));
-      const changesItinerary = Object.keys(patch).some((key) => !['accommodationBookingStatus', 'packingChecklist', 'packingChecklistCategories', 'packingChecklistInitialized'].includes(key));
+      const changesItinerary = Object.keys(patch).some((key) => !['accommodationBookingStatus', 'packingChecklist', 'packingChecklistCategories', 'packingChecklistInitialized', 'travelBudget', 'travelExpenses'].includes(key));
       if (hasItinerary && changesItinerary) setItineraryDirty(true);
     },
   }), [hasItinerary, itineraryDirty, trip]);
